@@ -1,0 +1,31 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 100
+indent_style = space
+indent_size = 2
+
+[*.cs]
+indent_size = 4
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+# Normalize strings to uppercase
+dotnet_diagnostic.CA1308.severity = warning
+# Use ordinal StringComparison
+dotnet_diagnostic.CA1309.severity = warning
+# Specify StringComparison for correctness
+dotnet_diagnostic.CA1310.severity = warning
+# Specify a culture or use an invariant version
+dotnet_diagnostic.CA1311.severity = warning
+# Identifiers should not contain type names
+dotnet_diagnostic.CA1720.severity = none
+# Remove unnecessary suppression
+dotnet_diagnostic.IDE0079.severity = none
+# Remove unnecessary expression value
+dotnet_diagnostic.IDE0058.severity = warning
+# Use collection expression for fluent
+dotnet_diagnostic.IDE0305.severity = none

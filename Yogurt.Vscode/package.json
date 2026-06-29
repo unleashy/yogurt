@@ -1,0 +1,37 @@
+{
+  "name": "yogurt",
+  "version": "0.0.1",
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "yarn run compile",
+    "compile": "tsgo -p ./",
+    "watch": "tsgo -watch -p ./",
+    "lint": "prettier --check . && eslint src",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/vscode": "^1.125",
+    "@typescript/native-preview": "7.0.0-dev.20260629.1",
+    "@unleashy/eslint": "unleashy/eslint#dd345d2e86dfce5dad9b97e13789af6723b1f76d",
+    "eslint": "10.6.0",
+    "prettier": "3.9.3",
+    "typescript": "6.0.3"
+  },
+  "displayName": "Yogurt",
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "yogurt.helloWorld",
+        "title": "Hello World"
+      }
+    ]
+  }
+}

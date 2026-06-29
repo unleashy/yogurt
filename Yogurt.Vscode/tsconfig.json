@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "node20",
+    "lib": ["ES2022"],
+    "skipLibCheck": true,
+
+    "rootDir": "src",
+    "outDir": "out",
+    "sourceMap": true,
+    "isolatedModules": true,
+
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "useUnknownInCatchVariables": true,
+
+    "types": ["node"]
+  }
+}
