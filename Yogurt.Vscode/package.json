@@ -2,10 +2,12 @@
   "name": "yogurt",
   "version": "0.0.1",
   "main": "./out/extension.js",
+  "type": "module",
   "scripts": {
-    "vscode:prepublish": "yarn run compile",
+    "vscode:prepublish": "yarn run compile && yarn run convert-yaml",
     "compile": "tsgo -p ./",
     "watch": "tsgo -watch -p ./",
+    "convert-yaml": "node scripts/convert-yaml.js",
     "lint": "prettier --check . && eslint src",
     "format": "prettier --write ."
   },
@@ -16,7 +18,8 @@
     "@unleashy/eslint": "unleashy/eslint#dd345d2e86dfce5dad9b97e13789af6723b1f76d",
     "eslint": "10.6.0",
     "prettier": "3.9.3",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "yaml": "^2.9.0"
   },
   "displayName": "Yogurt",
   "engines": {
@@ -25,12 +28,29 @@
   "categories": [
     "Programming Languages"
   ],
+  "extensionKind": [
+    "workspace"
+  ],
   "activationEvents": [],
   "contributes": {
-    "commands": [
+    "languages": [
       {
-        "command": "yogurt.helloWorld",
-        "title": "Hello World"
+        "id": "yogurt",
+        "extensions": [
+          ".yo"
+        ],
+        "aliases": [
+          "Yogurt",
+          "Yoghurt"
+        ],
+        "configuration": "./language/configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "yogurt",
+        "scopeName": "source.yo",
+        "path": "./out/syntaxes/yogurt.tmLanguage.json"
       }
     ]
   }

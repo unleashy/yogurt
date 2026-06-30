@@ -1,0 +1,6 @@
+---
+name: Yogurt
+scopeName: source.yo
+fileTypes: [yo]
+patterns:
+  - {}
