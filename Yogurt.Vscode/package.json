@@ -6,7 +6,7 @@
   "scripts": {
     "vscode:prepublish": "yarn run compile && yarn run convert-yaml",
     "compile": "tsgo -p ./",
-    "watch": "tsgo -watch -p ./",
+    "watch": "tsgo -watch -p ./ & node scripts/convert-yaml.js --watch",
     "convert-yaml": "node scripts/convert-yaml.js",
     "lint": "prettier --check . && eslint src",
     "format": "prettier --write ."

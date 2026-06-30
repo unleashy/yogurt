@@ -17,5 +17,8 @@
     "useUnknownInCatchVariables": true,
 
     "types": ["node"]
+  },
+  "watchOptions": {
+    "excludeDirectories": ["node_modules", "out", "language", "scripts"]
   }
 }

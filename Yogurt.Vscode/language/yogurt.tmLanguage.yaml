@@ -2,5 +2,16 @@
 name: Yogurt
 scopeName: source.yo
 fileTypes: [yo]
+
 patterns:
-  - {}
+  - include: '#comment'
+
+repository:
+  comment:
+    patterns:
+      - name: comment.line.double-slash.yo
+        begin: '(//).*$'
+        while: '^\s*(//).*$'
+        captures:
+          1:
+            name: punctuation.definition.comment.yo
