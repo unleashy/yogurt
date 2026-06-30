@@ -52,6 +52,17 @@
         "scopeName": "source.yo",
         "path": "./out/syntaxes/yogurt.tmLanguage.json"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Yogurt",
+      "properties": {
+        "yogurt.serverPath": {
+          "type": "string",
+          "scope": "machine-overridable",
+          "description": "Path to the Yogurt LSP binary",
+          "default": ""
+        }
+      }
+    }
   }
 }
