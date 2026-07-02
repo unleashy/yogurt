@@ -15,11 +15,11 @@
     "@types/node": "^24",
     "@types/vscode": "^1.125",
     "@typescript/native-preview": "7.0.0-dev.20260629.1",
-    "@unleashy/eslint": "unleashy/eslint#dd345d2e86dfce5dad9b97e13789af6723b1f76d",
+    "@unleashy/eslint": "unleashy/eslint#cdf74b283b180cbffc759a28a7a1891de83b9ee3",
     "eslint": "10.6.0",
     "prettier": "3.9.3",
     "typescript": "6.0.3",
-    "yaml": "^2.9.0"
+    "yaml": "2.9.0"
   },
   "displayName": "Yogurt",
   "engines": {
