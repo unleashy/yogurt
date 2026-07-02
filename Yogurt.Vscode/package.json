@@ -64,5 +64,8 @@
         }
       }
     }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^10.1.0"
   }
 }
