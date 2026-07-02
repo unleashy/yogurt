@@ -33,13 +33,11 @@ internal sealed class Cli
         }
     }
 
-    public abstract record TransportOption
+    public closed record class TransportOption
     {
         public sealed record Console : TransportOption;
         public sealed record Socket(uint Port) : TransportOption;
         public sealed record Pipe(FileInfo Path) : TransportOption;
-
-        private TransportOption() {}
     }
 
     private readonly RootCommand _command;

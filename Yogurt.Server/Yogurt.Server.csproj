@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <TargetFramework>net11.0</TargetFramework>
     <AssemblyName>yogurt</AssemblyName>
     <Version>0.1.0</Version>
   </PropertyGroup>
