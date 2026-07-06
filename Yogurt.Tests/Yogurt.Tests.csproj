@@ -18,5 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Yogurt.Server\Yogurt.Server.csproj"/>
+    <ProjectReference Include="..\Yogurt.Json\Yogurt.Json.csproj"/>
   </ItemGroup>
 </Project>
