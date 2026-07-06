@@ -26,6 +26,13 @@ public sealed class JsonParser
 
     public bool IsAtEnd => _s.Length == 0;
 
+    public void ExpectEnd()
+    {
+        if (!IsAtEnd) {
+            throw new JsonException("Expected no more tokens");
+        }
+    }
+
     public void ExpectNotAtEnd()
     {
         if (IsAtEnd) {
