@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Yogurt.Server;
 
-public class ProtocolListener(IDuplexPipe transport) : IProtocolListener
+public sealed class ProtocolListener(IDuplexPipe transport) : IProtocolListener
 {
     public async IAsyncEnumerable<ProtocolMessage> Listen(
         [EnumeratorCancellation] CancellationToken cancellationToken = default
@@ -122,7 +122,8 @@ public class ProtocolListener(IDuplexPipe transport) : IProtocolListener
                     }
                     else {
                         throw new InvalidDataException(
-                            $"Invalid Content-Length: expected an integer between 0 and 2^31-1, got '{header.Value}'"
+                            $"Invalid Content-Length: expected an integer between 0 and 2^31-1, " +
+                            $"got '{header.Value}'"
                         );
                     }
 
@@ -137,17 +138,16 @@ public class ProtocolListener(IDuplexPipe transport) : IProtocolListener
                     }
 
                     if (
-                        header.Value is (
+                        header.Value is
                             "application/vscode-jsonrpc; charset=utf-8" or
                             "application/vscode-jsonrpc; charset=utf8"
-                        )
                     ) {
                         contentType = header.Value;
                     }
                     else {
                         throw new InvalidDataException(
-                            $"Invalid Content-Type: expected 'application/vscode-jsonrpc; charset=utf-8', " +
-                            $"got '{header.Value}'"
+                            $"Invalid Content-Type: expected " +
+                            $"'application/vscode-jsonrpc; charset=utf-8', got '{header.Value}'"
                         );
                     }
 
