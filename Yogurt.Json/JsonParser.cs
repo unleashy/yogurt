@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Collections;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
@@ -410,22 +411,46 @@ public sealed class JsonParser
 
     public void SkipValue()
     {
-        if (Null()) return;
-        if (Boolean() is not null) return;
-        if (Number() is not null) return;
-        if (String() is not null) return;
+        var isArray = new BitArray(256);
+        var depth = 0;
 
-        if (Array()) {
-            while (ArrayElement()) SkipValue();
-            return;
+        try {
+            while (true) {
+                if (Null()) {}
+                else if (Boolean() is not null) {}
+                else if (Number() is not null) {}
+                else if (String() is not null) {}
+                else if (Array()) {
+                    isArray[depth++] = true;
+                }
+                else if (Object()) {
+                    isArray[depth++] = false;
+                }
+                else {
+                    throw new JsonException("Expected a value");
+                }
+
+                while (true) {
+                    if (depth == 0) return;
+
+                    var doBreak = isArray[depth - 1] ? ArrayElement() : ObjectKey() is not null;
+                    if (doBreak) break;
+
+                    --depth;
+                }
+            }
         }
-
-        if (Object()) {
-            while (ObjectKey() is not null) SkipValue();
-            return;
+        catch (ArgumentOutOfRangeException)
+        {
+            throw new JsonException("Nesting level too deep");
         }
+    }
 
-        throw new JsonException("Unexpected token");
+    public string ValueAsString()
+    {
+        var start = _s;
+        SkipValue();
+        return start[.. ^_s.Length];
     }
 
     private bool SkipWhile(SearchValues<char> values)
