@@ -2,7 +2,7 @@
 
 namespace Yogurt.Json;
 
-public static class ExpectObject
+public static class Expect
 {
     public static IHandler Require(string key, Action<JsonParser> parse) =>
         new Handler(key, parse, isRequired: true);

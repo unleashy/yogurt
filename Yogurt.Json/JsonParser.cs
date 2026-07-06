@@ -394,7 +394,7 @@ public sealed class JsonParser
         }
     }
 
-    public void ExpectObject(ExpectObject.IHandler handler)
+    public void ExpectObject(Expect.IHandler handler)
     {
         if (!Object()) {
             throw new JsonException("Expected an object");
@@ -409,8 +409,8 @@ public sealed class JsonParser
         handler.Complete();
     }
 
-    public void ExpectObject(params ExpectObject.IHandler[] handlers) =>
-        ExpectObject(Json.ExpectObject.Compose(handlers));
+    public void ExpectObject(params Expect.IHandler[] handlers) =>
+        ExpectObject(Expect.Compose(handlers));
 
     public Dictionary<string, T> ExpectObjectDictionary<T>(Func<JsonParser, T> parse)
     {

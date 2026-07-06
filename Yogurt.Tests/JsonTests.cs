@@ -243,32 +243,32 @@ public class JsonTests
         var forecast = new WeatherForecast();
 
         sut.ExpectObject(
-            ExpectObject.Require("Date", p => forecast.Date = ExpectDate(p)),
-            ExpectObject.Require("TemperatureCelsius", p =>
+            Expect.Require("Date", p => forecast.Date = ExpectDate(p)),
+            Expect.Require("TemperatureCelsius", p =>
                 forecast.TemperatureCelsius = p.ExpectNumber<int>()
             ),
-            ExpectObject.Allow("Summary", p =>
+            Expect.Allow("Summary", p =>
                 forecast.Summary = p.ExpectString()
             ),
-            ExpectObject.Allow("SummaryField", p =>
+            Expect.Allow("SummaryField", p =>
                 forecast.SummaryField = p.ExpectString()
             ),
-            ExpectObject.Allow("DatesAvailable", p =>
+            Expect.Allow("DatesAvailable", p =>
                 forecast.DatesAvailable = p.ExpectArray(ExpectDate).ToList()
             ),
-            ExpectObject.Allow("TemperatureRanges", p =>
+            Expect.Allow("TemperatureRanges", p =>
                 forecast.TemperatureRanges = p.ExpectObjectDictionary(p => {
                     var ranges = new HighLowTemps();
 
                     p.ExpectObject(
-                        ExpectObject.Require("High", p => ranges.High = p.ExpectNumber<int>()),
-                        ExpectObject.Require("Low", p => ranges.Low = p.ExpectNumber<int>())
+                        Expect.Require("High", p => ranges.High = p.ExpectNumber<int>()),
+                        Expect.Require("Low", p => ranges.Low = p.ExpectNumber<int>())
                     );
 
                     return ranges;
                 })
             ),
-            ExpectObject.Allow("SummaryWords", p =>
+            Expect.Allow("SummaryWords", p =>
                 forecast.SummaryWords = p.ExpectArray(p => p.ExpectString()).ToArray()
             )
         );
