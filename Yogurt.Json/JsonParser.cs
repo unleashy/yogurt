@@ -286,6 +286,21 @@ public sealed class JsonParser
     );
     #endregion String handling
 
+    public bool ExpectLiteral(bool literal) =>
+        ExpectBoolean() == literal
+            ? literal
+            : throw new JsonException($"Expected the boolean {literal}");
+
+    public T ExpectLiteral<T>(T literal) where T : struct, INumberBase<T> =>
+        ExpectNumber<T>() == literal
+            ? literal
+            : throw new JsonException($"Expected the number {literal}");
+
+    public string ExpectLiteral(string literal) =>
+        ExpectString() == literal
+            ? literal
+            : throw new JsonException($"Expected the string \"{literal}\"");
+
     public bool Array()
     {
         if (SkipWithSpaces('[')) {
