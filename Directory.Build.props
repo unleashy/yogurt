@@ -3,6 +3,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <PreferredUILang>en</PreferredUILang>
 
+    <NoWarn>$(NoWarn);CS8524</NoWarn>
+    <WarningsAsErrors>$(WarningsAsErrors);CS8509</WarningsAsErrors>
     <AnalysisMode>Recommended</AnalysisMode>
     <CodeAnalysisCulture>Invariant</CodeAnalysisCulture>
     <AnalysisModeGlobalization>Recommended</AnalysisModeGlobalization>
