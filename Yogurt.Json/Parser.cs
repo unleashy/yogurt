@@ -1,0 +1,594 @@
+﻿using System.Buffers;
+using System.Collections;
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
+
+namespace Yogurt.Json;
+
+internal ref struct Parser
+{
+    public static TokenSlice Parse(ReadOnlyMemory<byte> text)
+    {
+        var p = new Parser(text.Span);
+        p.Parse();
+        return new TokenSlice(text, p.Tokens());
+    }
+
+    private readonly ReadOnlySpan<byte> _text;
+    private ReadOnlySpan<byte> _s;
+    private ImmutableArray<Token>.Builder _tokens = ImmutableArray.CreateBuilder<Token>();
+    private BitArray _nesting = new(length: JsonValue.MaxDepth);
+    private int _depth = 0;
+    private bool _atStructureStart = false;
+
+    private Parser(ReadOnlySpan<byte> text)
+    {
+        _text = text;
+        _s = text;
+    }
+
+    private ReadOnlyMemory<Token> Tokens() => ImmutableCollectionsMarshal.AsMemory(_tokens);
+
+    private void Parse()
+    {
+        while (true) {
+            SkipSpaces();
+            var start = _s;
+
+            if (IsEmpty) break;
+            var c = Current;
+
+            switch (c) {
+                case '{': {
+                    _tokens.Add(ObjectOpen(start));
+                    break;
+                }
+
+                case '[': {
+                    _tokens.Add(ArrayOpen(start));
+                    break;
+                }
+
+                case '"': {
+                    _tokens.Add(String(start));
+                    break;
+                }
+
+                case >= '0' and <= '9' or '-' or '.': {
+                    _tokens.Add(Number(start));
+                    break;
+                }
+
+                case 'n' when Skip("null"u8): {
+                    _tokens.Add(Token(TokenKind.Null, start));
+                    break;
+                }
+
+                case 't' when Skip("true"u8): {
+                    _tokens.Add(Token(TokenKind.BoolTrue, start));
+                    break;
+                }
+
+                case 'f' when Skip("false"u8): {
+                    _tokens.Add(Token(TokenKind.BoolFalse, start));
+                    break;
+                }
+
+                default: {
+                    throw ErrorUnexpected(c);
+                }
+            }
+
+            while (true) {
+                if (_depth == 0) goto end;
+
+                if (_nesting[_depth - 1]) {
+                    if (ArrayCommaOrClose()) {
+                        break;
+                    }
+                }
+                else {
+                    if (ObjectCommaOrClose()) {
+                        break;
+                    }
+                }
+
+                --_depth;
+            }
+        }
+
+    end:
+        SkipSpaces();
+        if (!IsEmpty) {
+            throw ErrorTrailingData();
+        }
+
+        if (_tokens.Count == 0) {
+            throw ErrorEmpty();
+        }
+    }
+
+    private Token ObjectOpen(ReadOnlySpan<byte> start)
+    {
+        if (_depth > _nesting.Length) {
+            throw ErrorTooDeep();
+        }
+
+        _nesting[_depth++] = false;
+        _atStructureStart = true;
+
+        Advance();
+        return Token(TokenKind.ObjectOpen, start);
+    }
+
+    private Token ArrayOpen(ReadOnlySpan<byte> start)
+    {
+        if (_depth > _nesting.Length) {
+            throw ErrorTooDeep();
+        }
+
+        _nesting[_depth++] = true;
+        _atStructureStart = true;
+
+        Advance();
+        return Token(TokenKind.ArrayOpen, start);
+    }
+
+    private bool ArrayCommaOrClose()
+    {
+        SkipSpaces();
+        if (IsEmpty) throw ErrorUnclosedArray();
+
+        try {
+            var start = _s;
+
+            switch (Current) {
+                case ']': {
+                    Advance();
+                    _tokens.Add(Token(TokenKind.ArrayClose, start));
+                    return false;
+                }
+
+                case ',' when !_atStructureStart: {
+                    Advance();
+
+                    SkipSpaces();
+                    if (Has(']')) {
+                        throw ErrorTrailingComma();
+                    }
+
+                    return true;
+                }
+
+                default: {
+                    if (!_atStructureStart) {
+                        throw ErrorMissingArrayComma(Current);
+                    }
+
+                    return true;
+                }
+            }
+        }
+        finally {
+            _atStructureStart = false;
+        }
+    }
+
+    private bool ObjectCommaOrClose()
+    {
+        SkipSpaces();
+        if (IsEmpty) throw ErrorUnclosedObject();
+
+        try {
+            var start = _s;
+
+            switch (Current) {
+                case '}': {
+                    Advance();
+                    _tokens.Add(Token(TokenKind.ObjectClose, start));
+                    return false;
+                }
+
+                case ',' when !_atStructureStart: {
+                    Advance();
+
+                    SkipSpaces();
+                    if (Has('}')) {
+                        throw ErrorTrailingComma();
+                    }
+
+                    break;
+                }
+
+                default: {
+                    if (!_atStructureStart) {
+                        throw ErrorMissingObjectComma(Current);
+                    }
+
+                    break;
+                }
+            }
+
+            SkipSpaces();
+            start = _s;
+
+            if (!Has('"')) {
+                if (IsEmpty) {
+                    throw ErrorUnclosedObject();
+                }
+                else if (Has(',')) {
+                    throw ErrorUnexpected(',');
+                }
+                else {
+                    throw ErrorInvalidObjectKey(Current);
+                }
+            }
+
+            _tokens.Add(String(start));
+
+            SkipSpaces();
+            if (!Skip(':')) {
+                if (IsEmpty) {
+                    throw ErrorUnclosedObject();
+                }
+                else {
+                    throw ErrorMissingObjectColon(Current);
+                }
+            }
+
+            return true;
+        }
+        finally {
+            _atStructureStart = false;
+        }
+    }
+
+    private Token String(ReadOnlySpan<byte> start)
+    {
+        var quote = Skip('"');
+        Debug.Assert(quote);
+
+        var nextIndex = _s.IndexOfAny(RelevantStringChars);
+        if (nextIndex == -1) {
+            throw ErrorUnterminatedString();
+        }
+
+        if (_s[nextIndex] == '"') {
+            AdvanceBy(nextIndex + 1);
+            return Token(TokenKind.StringSimple, start);
+        }
+        else {
+            return StringComplex(nextIndex, start);
+        }
+    }
+
+    #region String handling
+    private Token StringComplex(int nextIndex, ReadOnlySpan<byte> start)
+    {
+        _tokens.Add(Token(TokenKind.StringComplexStart, start));
+
+        while (nextIndex != -1) {
+            var ch = (char)_s[nextIndex];
+            start = _s[nextIndex ..];
+            _s = _s[(nextIndex + 1) ..];
+
+            switch (ch) {
+                case '\\': {
+                    _tokens.Add(InterpretEscape(start));
+                    break;
+                }
+
+                case '"': {
+                    return Token(TokenKind.StringComplexEnd, start);
+                }
+
+                default: {
+                    Debug.Assert(ch <= '\x1F');
+                    throw ErrorControlChar(ch);
+                }
+            }
+
+            nextIndex = _s.IndexOfAny(RelevantStringChars);
+        }
+
+        throw ErrorUnterminatedString();
+    }
+
+    private Token InterpretEscape(ReadOnlySpan<byte> start)
+    {
+        if (IsEmpty) {
+            throw ErrorUnterminatedEscape();
+        }
+
+        switch (Current) {
+            case '"' or '\\' or '/' or 'b' or 'f' or 'n' or 'r' or 't': {
+                Advance();
+                return Token(TokenKind.StringEscape, start);
+            }
+
+            case 'u': {
+                Advance();
+                return InterpretUnicodeEscape(start);
+            }
+
+            default: {
+                throw ErrorInvalidEscape(Current);
+            }
+        }
+    }
+
+    private Token InterpretUnicodeEscape(ReadOnlySpan<byte> start)
+    {
+        var highCh = ParseUnicodeEscapeHexDigits();
+        if (Rune.IsValid(highCh)) {
+            return Token(TokenKind.StringEscapeUnicode, start);
+        }
+
+        if (char.IsLowSurrogate(highCh)) {
+            throw ErrorLoneLowSurrogateEscape(highCh);
+        }
+
+        // Ensure the very next element is an unicode escape for a low surrogate
+        Debug.Assert(char.IsHighSurrogate(highCh));
+        if (!Skip(@"\u"u8)) {
+            throw ErrorLoneHighSurrogateEscape(highCh);
+        }
+
+        var lowCh = ParseUnicodeEscapeHexDigits();
+        return char.IsSurrogatePair(highCh, lowCh)
+            ? Token(TokenKind.StringEscapeUnicodePair, start)
+            : throw ErrorBadSurrogatePair(highCh, lowCh);
+    }
+
+    private char ParseUnicodeEscapeHexDigits()
+    {
+        var start = _s;
+        for (var i = 0; i < 4; ++i) {
+            if (IsEmpty) {
+                throw ErrorUnterminatedEscape();
+            }
+
+            if (!char.IsAsciiHexDigit(Current)) {
+                throw ErrorShortUnicodeEscape(i);
+            }
+
+            Advance();
+        }
+
+        var digits = start[.. ^_s.Length];
+        Debug.Assert(digits.Length == 4);
+        Debug.Assert(digits.ToArray().All(it => char.IsAsciiHexDigit((char)it)));
+
+        // ushort.Parse cannot fail because the previous loop guarantees that the escape
+        // contains exactly 4 hexadecimal digits, which can never overflow an ushort
+        return (char)ushort.Parse(
+            digits,
+            NumberStyles.AllowHexSpecifier,
+            CultureInfo.InvariantCulture
+        );
+    }
+
+    private static readonly SearchValues<byte> RelevantStringChars = SearchValues.Create(
+        // Control characters
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+
+        // Quote
+        0x22,
+
+        // Backslash
+        0x5C
+    );
+    #endregion String handling
+
+    private Token Number(ReadOnlySpan<byte> start)
+    {
+        if (Skip('.')) {
+            throw ErrorLeadingDecPoint();
+        }
+
+        var negative = Skip('-');
+
+        if (Skip('0')) {
+            if (Has(NumberChars)) {
+                throw ErrorLeadingZero();
+            }
+        }
+        else if (!SkipWhile(NumberChars) && negative) {
+            throw ErrorMissingNegDigit();
+        }
+
+        if (Skip('.')) {
+            if (!SkipWhile(NumberChars)) {
+                throw ErrorMissingFracDigit();
+            }
+        }
+
+        if (Skip('e') || Skip('E')) {
+            _ = Skip('+') || Skip('-');
+            if (!SkipWhile(NumberChars)) {
+                throw ErrorMissingExpDigit();
+            }
+        }
+
+        return Token(TokenKind.Number, start);
+    }
+
+    private static readonly SearchValues<byte> NumberChars = SearchValues.Create("0123456789"u8);
+
+    private Token Token(TokenKind kind, ReadOnlySpan<byte> start)
+    {
+        var offset = _text.Length - start.Length;
+        var length = start.Length - _s.Length;
+        return new Token(kind, offset, length);
+    }
+
+    private void SkipSpaces()
+    {
+        _s = _s.TrimStart(" \n\r\t"u8);
+    }
+
+    private bool SkipWhile(SearchValues<byte> values)
+    {
+        var cutoff = _s.IndexOfAnyExcept(values);
+        if (cutoff == -1) cutoff = _s.Length;
+
+        _s = _s[cutoff ..];
+        return cutoff != 0;
+    }
+
+    private bool Skip(char prefix)
+    {
+        if (Has(prefix)) {
+            Advance();
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    private bool Skip(ReadOnlySpan<byte> prefix)
+    {
+        if (Has(prefix)) {
+            AdvanceBy(prefix.Length);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    private bool Has(char c) => _s.StartsWith((byte)c);
+
+    private bool Has(ReadOnlySpan<byte> prefix) => _s.StartsWith(prefix);
+
+    private bool Has(SearchValues<byte> values) => _s.Length > 0 && values.Contains(_s[0]);
+
+    private void Advance()
+    {
+        AdvanceBy(1);
+    }
+
+    private void AdvanceBy(int n)
+    {
+        Debug.Assert(_s.Length >= n);
+        _s = _s[n ..];
+    }
+
+    private bool IsEmpty => _s.IsEmpty;
+
+    private char Current => (char)_s[0];
+
+    private JsonException ErrorEmpty() =>
+        Error("Unexpected end of input: no JSON value found");
+
+    private JsonException ErrorUnexpected(char c) =>
+        Error($"Unexpected character '{c}'");
+
+    private JsonException ErrorTrailingData() =>
+        Error("Unexpected trailing content after JSON value");
+
+    private JsonException ErrorTooDeep() =>
+        Error($"Maximum nesting depth of {JsonValue.MaxDepth} exceeded");
+
+    private JsonException ErrorUnclosedObject() =>
+        Error("Unexpected end of input: unclosed object");
+
+    private JsonException ErrorMissingObjectComma(char c) =>
+        Error($"Expected ',' or '}}' after value in object; found '{c}'");
+
+    private JsonException ErrorInvalidObjectKey(char c) =>
+        Error($"Object keys must be strings; found '{c}'");
+
+    private JsonException ErrorMissingObjectColon(char c) =>
+        Error($"Expected ':' after object key; found '{c}'");
+
+    private JsonException ErrorUnclosedArray() =>
+        Error("Unexpected end of input: unclosed array");
+
+    private JsonException ErrorTrailingComma() =>
+        Error("Trailing comma is not allowed");
+
+    private JsonException ErrorMissingArrayComma(char c) =>
+        Error($"Expected ',' or ']' after value in array; found '{c}'");
+
+    private JsonException ErrorLeadingZero() =>
+        Error("Invalid number: leading zero is not allowed");
+
+    private JsonException ErrorLeadingDecPoint() =>
+        Error("Invalid number: leading decimal point is not allowed");
+
+    private JsonException ErrorMissingNegDigit() =>
+        Error("Invalid number: expected digit after negative sign '-'");
+
+    private JsonException ErrorMissingFracDigit() =>
+        Error("Invalid number: expected digit after decimal point '.'");
+
+    private JsonException ErrorMissingExpDigit() =>
+        Error("Invalid number: expected digit after exponent");
+
+    private JsonException ErrorUnterminatedString() =>
+        Error("Unterminated string");
+
+    private JsonException ErrorControlChar(char c) =>
+        Error($@"Unescaped control character '\x{(ushort)c:X2}' in string");
+
+    private JsonException ErrorUnterminatedEscape() =>
+        Error("Unexpected end of input while parsing escape sequence");
+
+    private JsonException ErrorInvalidEscape(char c) =>
+        Error($@"Invalid escape sequence '\{c}' in string");
+
+    private JsonException ErrorShortUnicodeEscape(int n) =>
+        Error($"Invalid Unicode escape sequence: expected 4 hexadecimal digits; found {n}");
+
+    private JsonException ErrorLoneLowSurrogateEscape(char c) =>
+        Error(
+            $@"Invalid Unicode escape sequence: unexpected low surrogate '\u{(ushort)c:X4}' not " +
+            $"following a high surrogate"
+        );
+
+    private JsonException ErrorLoneHighSurrogateEscape(char c) =>
+        Error(
+            $@"Invalid Unicode escape sequence: expected high surrogate '\u{(ushort)c:X4}' to " +
+            $"be paired with a low surrogate"
+        );
+
+    private JsonException ErrorBadSurrogatePair(char highCh, char lowCh) =>
+        Error(
+            $"Invalid Unicode escape sequence: expected high surrogate " +
+            $@"'\u{(ushort)highCh:X4}' to be followed by a low surrogate; " +
+            $@"found '\u{(ushort)lowCh:X4}'"
+        );
+
+    private JsonException Error(string message)
+    {
+        var (line, column) = GetLineAndColumn(_text, _s);
+        return new JsonException(message, path: null, lineNumber: line, bytePositionInLine: column);
+    }
+
+    private static (int, int) GetLineAndColumn(ReadOnlySpan<byte> start, ReadOnlySpan<byte> end)
+    {
+        var line = 0;
+        var column = 0;
+
+        var offset = start.Length - end.Length;
+        for (var i = 1; i < offset; ++i) {
+            ++column;
+
+            if (start[i - 1] == '\n') {
+                ++line;
+                column = 0;
+            }
+        }
+
+        return (line, column);
+    }
+}

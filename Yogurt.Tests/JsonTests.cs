@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+﻿using System.Text;
 using System.Text.Json;
 using Yogurt.Json;
 
@@ -6,37 +6,39 @@ namespace Yogurt.Tests;
 
 public class JsonTests
 {
+    private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
+
+    private static JsonValue Parse(string s) => JsonValue.Parse(Utf8.GetBytes(s));
+
     [Test]
     public void Empty()
     {
+        var sut = () => Parse("");
+
         Assert.That(
-            () => new JsonParser(""),
+            sut,
             Throws
                 .TypeOf<JsonException>().And
-                .Message.EqualTo("Unexpected empty JSON document")
+                .Message.EqualTo("Unexpected end of input: no JSON value found")
         );
     }
 
     [Test]
     public void Null()
     {
-        var sut = new JsonParser("null");
+        var sut = Parse("null");
 
-        using (Assert.EnterMultipleScope()) {
-            Assert.That(sut.Null(), Is.True);
-            Assert.That(sut.IsAtEnd, Is.True);
-        }
+        Assert.That(sut.TryNull(), Is.True);
     }
 
     [TestCase("true", true)]
     [TestCase("false", false)]
     public void Booleans(string input, bool expected)
     {
-        var sut = new JsonParser(input);
+        var sut = Parse(input);
 
         using (Assert.EnterMultipleScope()) {
-            Assert.That(sut.Boolean(), Is.EqualTo(expected));
-            Assert.That(sut.IsAtEnd, Is.True);
+            Assert.That(sut.TryBoolean(), Is.EqualTo(expected));
         }
     }
 
@@ -52,68 +54,65 @@ public class JsonTests
     [TestCase(@"bunny: \uD83D\uDC07!", "bunny: 🐇!")]
     public void Strings(string raw, string interpreted)
     {
-        var sut = new JsonParser($"\"{raw}\"");
+        var sut = Parse($"\"{raw}\"");
 
-        using (Assert.EnterMultipleScope()) {
-            Assert.That(sut.String(), Is.EqualTo(interpreted));
-            Assert.That(sut.IsAtEnd, Is.True);
-        }
+        Assert.That(sut.TryString(), Is.EqualTo(interpreted));
     }
 
     [TestCase(
         """
         "
         """,
-        "Unclosed string literal"
-)]
+        "Unterminated string"
+    )]
     [TestCase(
         """
         "bad\escape"
         """,
-        @"Invalid escape sequence '\e'"
+        @"Invalid escape sequence '\e' in string"
     )]
     [TestCase(
         """
         "\
         """,
-        "Unexpected end of input"
+        "Unexpected end of input while parsing escape sequence"
     )]
     [TestCase(
         """
         "\u123"
         """,
-        "Invalid Unicode escape sequence; expected 4 hexadecimal digits"
+        "Invalid Unicode escape sequence: expected 4 hexadecimal digits; found 3"
     )]
     [TestCase(
         """
         "\u12G4"
         """,
-        "Invalid Unicode escape sequence; expected 4 hexadecimal digits"
+        "Invalid Unicode escape sequence: expected 4 hexadecimal digits; found 2"
     )]
-    [TestCase("\"\u001F\"", "Unescaped control character in string literal")]
+    [TestCase("\"\u001F\"", @"Unescaped control character '\x1F' in string")]
     [TestCase(
         """
         "\uD800"
         """,
-        "Lone surrogate in string literal"
+        @"Invalid Unicode escape sequence: expected high surrogate '\uD800' to be paired with a low surrogate"
     )]
     [TestCase(
         """
         "\uDC00"
         """,
-        "Lone surrogate in string literal"
+        @"Invalid Unicode escape sequence: unexpected low surrogate '\uDC00' not following a high surrogate"
     )]
     [TestCase(
         """
         "\uD800\u0041"
         """,
-        "Malformed surrogate pair in string literal"
+        @"Invalid Unicode escape sequence: expected high surrogate '\uD800' to be followed by a low surrogate; found '\u0041'"
     )]
     public void StringsInvalid(string raw, string message)
     {
-        var sut = new JsonParser(raw);
+        var sut = () => Parse(raw);
 
-        Assert.That(sut.String,
+        Assert.That(sut,
             Throws
                 .TypeOf<JsonException>().And
                 .Message.EqualTo(message)
@@ -136,26 +135,27 @@ public class JsonTests
     [TestCase("100000e0")]
     public void Numbers(string input)
     {
-        var sut = new JsonParser(input);
+        var sut = Parse(input);
 
-        var result = sut.Number();
+        var result = sut.TryNumber();
 
         Assert.That(result, Is.EqualTo(input));
     }
 
-    [TestCase("01", "Invalid leading zero in number literal")]
-    [TestCase("-01", "Invalid leading zero in number literal")]
-    [TestCase("-", "Expected a number after '-'")]
-    [TestCase("1.", "Expected digits for fractional part")]
-    [TestCase("1e", "Expected digits for exponent part")]
-    [TestCase("1E", "Expected digits for exponent part")]
-    [TestCase("1e+", "Expected digits for exponent part")]
-    [TestCase("1e-", "Expected digits for exponent part")]
+    [TestCase("01", "Invalid number: leading zero is not allowed")]
+    [TestCase("-01", "Invalid number: leading zero is not allowed")]
+    [TestCase("-", "Invalid number: expected digit after negative sign '-'")]
+    [TestCase("1.", "Invalid number: expected digit after decimal point '.'")]
+    [TestCase(".1", "Invalid number: leading decimal point is not allowed")]
+    [TestCase("1e", "Invalid number: expected digit after exponent")]
+    [TestCase("1E", "Invalid number: expected digit after exponent")]
+    [TestCase("1e+", "Invalid number: expected digit after exponent")]
+    [TestCase("1e-", "Invalid number: expected digit after exponent")]
     public void NumbersInvalid(string input, string message)
     {
-        var sut = new JsonParser(input);
+        var sut = () => Parse(input);
 
-        Assert.That(sut.Number,
+        Assert.That(sut,
             Throws
                 .TypeOf<JsonException>().And
                 .Message.EqualTo(message)
@@ -167,21 +167,33 @@ public class JsonTests
     [TestCase("[1, 2, 3]", new[] { 1, 2, 3 })]
     public void Arrays(string input, int[] values)
     {
-        var sut = new JsonParser(input);
+        var sut = Parse(input);
 
         var result = new List<int>();
-        if (sut.Array()) {
-            while (sut.ArrayElement()) {
-                if (sut.Number<int>() is {} n) {
+        if (sut.TryArray()) {
+            while (sut.TryArrayElement()) {
+                if (sut.TryNumber<int>() is {} n) {
                     result.Add(n);
                 }
             }
         }
 
-        using (Assert.EnterMultipleScope()) {
-            Assert.That(result, Is.EqualTo(values));
-            Assert.That(sut.IsAtEnd, Is.True);
-        }
+        Assert.That(result, Is.EqualTo(values));
+    }
+
+    [TestCase("[", "Unexpected end of input: unclosed array")]
+    [TestCase("[,1]", "Unexpected character ','")]
+    [TestCase("[1, 2,]", "Trailing comma is not allowed")]
+    [TestCase("[1 2]", "Expected ',' or ']' after value in array; found '2'")]
+    public void ArraysInvalid(string input, string message)
+    {
+        var sut = () => Parse(input);
+
+        Assert.That(sut,
+            Throws
+                .TypeOf<JsonException>().And
+                .Message.EqualTo(message)
+        );
     }
 
     [TestCase("{}", new string[0], new int[0])]
@@ -191,123 +203,50 @@ public class JsonTests
     public void Objects(string input, string[] keys, int[] values)
     {
         var entries = keys.Zip(values).ToArray();
-        var sut = new JsonParser(input);
+        var sut = Parse(input);
 
         var result = new List<(string, int)>();
-        if (sut.Object()) {
-            while (sut.ObjectKey() is {} key) {
-                if (sut.Number<int>() is {} value) {
+        if (sut.TryObject()) {
+            while (sut.TryObjectKey() is {} key) {
+                if (sut.TryNumber<int>() is {} value) {
                     result.Add((key, value));
                 }
             }
         }
 
-        using (Assert.EnterMultipleScope()) {
-            Assert.That(result, Is.EqualTo(entries));
-            Assert.That(sut.IsAtEnd, Is.True);
-        }
+        Assert.That(result, Is.EqualTo(entries));
     }
 
-    [Test]
-    public void Complex()
+    [TestCase("{", "Unexpected end of input: unclosed object")]
+    [TestCase("""{"" """, "Unexpected end of input: unclosed object")]
+    [TestCase("""{"":1""", "Unexpected end of input: unclosed object")]
+    [TestCase("""{"":1,""", "Unexpected end of input: unclosed object")]
+    [TestCase("""{,"":1}""", "Unexpected character ','")]
+    [TestCase("""{"":1,}""", "Trailing comma is not allowed")]
+    [TestCase("""{"":1 "":2}""", "Expected ',' or '}' after value in object; found '\"'")]
+    [TestCase("{1:2}", "Object keys must be strings; found '1'")]
+    [TestCase("""{"" 1}""", "Expected ':' after object key; found '1'")]
+    public void ObjectsInvalid(string input, string message)
     {
-        var sut = new JsonParser(
-            """
-            {
-              "Date": "2019-08-01T00:00:00-07:00",
-              "TemperatureCelsius": 25,
-              "Summary": "Hot",
-              "DatesAvailable": [
-                "2019-08-01T00:00:00-07:00",
-                "2019-08-02T00:00:00-07:00"
-              ],
-              "TemperatureRanges": {
-                "Cold": {
-                  "High": 20,
-                  "Low": -10
-                },
-                "Hot": {
-                  "High": 60,
-                  "Low": 20
-                }
-              },
-              "SummaryWords": [
-                "Cool",
-                "Windy",
-                "Humid"
-              ]
-            }
-            """
+        var sut = () => Parse(input);
+
+        Assert.That(sut,
+            Throws
+                .TypeOf<JsonException>().And
+                .Message.EqualTo(message)
         );
+    }
 
-        var forecast = new WeatherForecast();
+    [TestCase("1 2", "Unexpected trailing content after JSON value")]
+    [TestCase("[][]", "Unexpected trailing content after JSON value")]
+    public void TrailingData(string input, string message)
+    {
+        var sut = () => Parse(input);
 
-        sut.ExpectObject(
-            Expect.Require("Date", p => forecast.Date = ExpectDate(p)),
-            Expect.Require("TemperatureCelsius", p =>
-                forecast.TemperatureCelsius = p.ExpectNumber<int>()
-            ),
-            Expect.Allow("Summary", p =>
-                forecast.Summary = p.ExpectString()
-            ),
-            Expect.Allow("SummaryField", p =>
-                forecast.SummaryField = p.ExpectString()
-            ),
-            Expect.Allow("DatesAvailable", p =>
-                forecast.DatesAvailable = p.ExpectArray(ExpectDate).ToList()
-            ),
-            Expect.Allow("TemperatureRanges", p =>
-                forecast.TemperatureRanges = p.ExpectObjectDictionary(p => {
-                    var ranges = new HighLowTemps();
-
-                    p.ExpectObject(
-                        Expect.Require("High", p => ranges.High = p.ExpectNumber<int>()),
-                        Expect.Require("Low", p => ranges.Low = p.ExpectNumber<int>())
-                    );
-
-                    return ranges;
-                })
-            ),
-            Expect.Allow("SummaryWords", p =>
-                forecast.SummaryWords = p.ExpectArray(p => p.ExpectString()).ToArray()
-            )
+        Assert.That(sut,
+            Throws
+                .TypeOf<JsonException>().And
+                .Message.EqualTo(message)
         );
-
-        using (Assert.EnterMultipleScope()) {
-            Assert.That(forecast.Date,
-                Is.EqualTo(new DateTimeOffset(2019, 8, 1, 0, 0, 0, TimeSpan.FromHours(-7)))
-            );
-            Assert.That(forecast.TemperatureCelsius, Is.EqualTo(25));
-            Assert.That(forecast.Summary, Is.EqualTo("Hot"));
-            Assert.That(forecast.SummaryField, Is.Null);
-            Assert.That(forecast.DatesAvailable, Is.EqualTo(new List<DateTimeOffset> {
-                new (2019, 8, 1, 0, 0, 0, TimeSpan.FromHours(-7)),
-                new (2019, 8, 2, 0, 0, 0, TimeSpan.FromHours(-7)),
-            }));
-            Assert.That(forecast.TemperatureRanges,
-                Is.EqualTo(new Dictionary<string, HighLowTemps> {
-                    ["Cold"] = new() { High = 20, Low = -10 },
-                    ["Hot"] = new() { High = 60, Low = 20 },
-                })
-            );
-            Assert.That(forecast.SummaryWords, Is.EqualTo(["Cool", "Windy", "Humid"]));
-        }
-
-        return;
-
-        static DateTimeOffset ExpectDate(JsonParser p) =>
-            DateTimeOffset.Parse(p.ExpectString(), CultureInfo.InvariantCulture);
     }
 }
-
-internal record struct WeatherForecast(
-    DateTimeOffset Date,
-    int TemperatureCelsius,
-    string? Summary,
-    string? SummaryField,
-    IList<DateTimeOffset>? DatesAvailable,
-    Dictionary<string, HighLowTemps>? TemperatureRanges,
-    string[]? SummaryWords
-);
-
-internal record struct HighLowTemps(int High, int Low);
