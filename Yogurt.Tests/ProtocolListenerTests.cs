@@ -9,8 +9,8 @@ public class ProtocolListenerTests
     [Test]
     public async Task Empty()
     {
-        var transport = new FakeTransport();
-        var sut = new ProtocolListener(transport);
+        var reader = FakePipeReader();
+        var sut = new ProtocolListener(reader);
 
         var result = await sut.Listen().ToArrayAsync();
 
@@ -20,8 +20,8 @@ public class ProtocolListenerTests
     [Test]
     public async Task SingleMessage()
     {
-        var transport = new FakeTransport("Content-Length: 4\r\n\r\nabcd");
-        var sut = new ProtocolListener(transport);
+        var reader = FakePipeReader("Content-Length: 4\r\n\r\nabcd");
+        var sut = new ProtocolListener(reader);
 
         var result = await sut.Listen().ToArrayAsync();
 
@@ -31,8 +31,8 @@ public class ProtocolListenerTests
     [Test]
     public async Task Utf8Encoding()
     {
-        var transport = new FakeTransport("Content-Length: 4\r\n\r\n🐇");
-        var sut = new ProtocolListener(transport);
+        var reader = FakePipeReader("Content-Length: 4\r\n\r\n🐇");
+        var sut = new ProtocolListener(reader);
 
         var result = await sut.Listen().ToArrayAsync();
 
@@ -46,8 +46,8 @@ public class ProtocolListenerTests
         var first = headers.Concat<byte>([0xF0, 0x9F]).ToArray();
         var second = new byte[] { 0x8D, 0x9E };
 
-        var transport = new FakeTransport([first, second]);
-        var sut = new ProtocolListener(transport);
+        var reader = FakePipeReader([first, second]);
+        var sut = new ProtocolListener(reader);
 
         var result = await sut.Listen().ToArrayAsync();
 
@@ -57,10 +57,10 @@ public class ProtocolListenerTests
     [Test]
     public async Task MultiMessage()
     {
-        var transport = new FakeTransport(
+        var reader = FakePipeReader(
             "Content-Length: 6\r\n\r\nyogurtContent-Length: 9\r\n\r\nice cream"
         );
-        var sut = new ProtocolListener(transport);
+        var sut = new ProtocolListener(reader);
 
         var result = await sut.Listen().ToArrayAsync();
 
@@ -73,11 +73,11 @@ public class ProtocolListenerTests
     [Test]
     public async Task MultiChunk()
     {
-        var transport = new FakeTransport(
+        var reader = FakePipeReader(
             "Content-Length: 10\r\n\r\nstrawberry",
             "Content-Length: 6\r\n\r\npapaya"
         );
-        var sut = new ProtocolListener(transport);
+        var sut = new ProtocolListener(reader);
 
         var result = await sut.Listen().ToArrayAsync();
 
@@ -90,12 +90,12 @@ public class ProtocolListenerTests
     [Test]
     public async Task SplitChunk()
     {
-        var transport = new FakeTransport(
+        var reader = FakePipeReader(
             "Content-",
             "Length: 17\r\n\r\nblack f",
             "orest cake"
         );
-        var sut = new ProtocolListener(transport);
+        var sut = new ProtocolListener(reader);
 
         var result = await sut.Listen().ToArrayAsync();
 
@@ -107,11 +107,11 @@ public class ProtocolListenerTests
     [Test]
     public async Task SplitChunkAtHeaderSep()
     {
-        var transport = new FakeTransport(
+        var reader = FakePipeReader(
             "Content-Length: 5\r\n",
             "\r\nscone"
         );
-        var sut = new ProtocolListener(transport);
+        var sut = new ProtocolListener(reader);
 
         var result = await sut.Listen().ToArrayAsync();
 
@@ -123,10 +123,10 @@ public class ProtocolListenerTests
     [Test]
     public async Task ZeroLength()
     {
-        var transport = new FakeTransport(
+        var reader = FakePipeReader(
             "Content-Length: 0\r\n\r\n"
         );
-        var sut = new ProtocolListener(transport);
+        var sut = new ProtocolListener(reader);
 
         var result = await sut.Listen().ToArrayAsync();
 
@@ -139,12 +139,12 @@ public class ProtocolListenerTests
     [TestCase("utf8")]
     public async Task WithContentType(string charset)
     {
-        var transport = new FakeTransport(
+        var reader = FakePipeReader(
             $"Content-Type: application/vscode-jsonrpc; charset={charset}\r\n",
             "Content-Length: 13\r\n",
             "\r\ndoce de leite"
         );
-        var sut = new ProtocolListener(transport);
+        var sut = new ProtocolListener(reader);
 
         var result = await sut.Listen().ToArrayAsync();
 
@@ -166,8 +166,8 @@ public class ProtocolListenerTests
     [TestCase("content-length 1\r\n\r\nx", "Invalid header: missing ': ' separator")]
     public async Task InvalidData(string input, string message)
     {
-        var transport = new FakeTransport(input);
-        var sut = new ProtocolListener(transport);
+        var reader = FakePipeReader(input);
+        var sut = new ProtocolListener(reader);
 
         await Assert.ThatAsync(
             () => sut.Listen().ToArrayAsync().AsTask(),
@@ -180,10 +180,10 @@ public class ProtocolListenerTests
     [Test]
     public async Task EarlyCancellation()
     {
-        var transport = new FakeTransport(
+        var reader = FakePipeReader(
             "Content-Length: 9\r\n\r\ncancelled"
         );
-        var sut = new ProtocolListener(transport);
+        var sut = new ProtocolListener(reader);
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
@@ -195,11 +195,11 @@ public class ProtocolListenerTests
     [Test]
     public async Task MidwayCancellation()
     {
-        var transport = new FakeTransport(
+        var reader = FakePipeReader(
             "Content-Length: 13\r\n\r\nnot cancelled",
             "Content-Length: 9\r\n\r\ncancelled"
         );
-        var sut = new ProtocolListener(transport);
+        var sut = new ProtocolListener(reader);
         using var cts = new CancellationTokenSource();
 
         var e = sut.Listen(cts.Token).GetAsyncEnumerator(cts.Token);
@@ -216,24 +216,12 @@ public class ProtocolListenerTests
             Assert.That(second, Is.False);
         }
     }
-}
 
-internal sealed class FakeTransport : IDuplexPipe
-{
-    public MemoryStream OutputStream { get; } = new();
+    private static PipeReader FakePipeReader(byte[][] rawChunks) =>
+        PipeReader.Create(new ChunkyStream(rawChunks));
 
-    public PipeReader Input { get; }
-    public PipeWriter Output { get; }
-
-    public FakeTransport(byte[][] rawChunks)
-    {
-        Input = PipeReader.Create(new ChunkyStream(rawChunks));
-        Output = PipeWriter.Create(OutputStream);
-    }
-
-    public FakeTransport(params string[] chunks)
-        : this(chunks.Select(Encoding.UTF8.GetBytes).ToArray())
-    {}
+    private static PipeReader FakePipeReader(params string[] chunks) =>
+        FakePipeReader(chunks.Select(Encoding.UTF8.GetBytes).ToArray());
 }
 
 internal sealed class ChunkyStream(byte[][] chunks) : Stream

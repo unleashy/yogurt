@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Yogurt.Server;
 
-public sealed class ProtocolListener(IDuplexPipe transport) : IProtocolListener
+public sealed class ProtocolListener(PipeReader reader) : IProtocolListener
 {
     public async IAsyncEnumerable<ProtocolMessage> Listen(
         [EnumeratorCancellation] CancellationToken cancellationToken = default
@@ -28,8 +28,6 @@ public sealed class ProtocolListener(IDuplexPipe transport) : IProtocolListener
         CancellationToken cancellationToken = default
     )
     {
-        var reader = transport.Input;
-
         var read = await reader.ReadAtLeastAsync(contentLength, cancellationToken);
         var buffer = read.Buffer;
 
@@ -57,8 +55,6 @@ public sealed class ProtocolListener(IDuplexPipe transport) : IProtocolListener
 
     private async ValueTask<int?> ReadHeaders(CancellationToken cancellationToken = default)
     {
-        var reader = transport.Input;
-
         while (true) {
             var read = await reader.ReadAsync(cancellationToken);
             var buffer = read.Buffer;

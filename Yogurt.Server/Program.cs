@@ -1,5 +1,4 @@
 ﻿using System.Runtime.CompilerServices;
-
 using Yogurt.Server;
 
 var result = Cli.Parse(args);
@@ -14,7 +13,7 @@ var transport = result.Transport switch {
     _ => throw new SwitchExpressionException(result.Transport),
 };
 
-var listener = new ProtocolListener(transport);
+var listener = new ProtocolListener(transport.Input);
 
 await foreach (var message in listener.Listen()) {
     Console.Error.WriteLine(message);
