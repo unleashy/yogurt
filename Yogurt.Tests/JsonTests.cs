@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using System.Text.Json;
 using Yogurt.Json;
 
 namespace Yogurt.Tests;
@@ -18,7 +17,7 @@ public class JsonTests
         Assert.That(
             sut,
             Throws
-                .TypeOf<JsonException>().And
+                .TypeOf<JsonParseException>().And
                 .Message.EqualTo("Unexpected end of input: no JSON value found")
         );
     }
@@ -114,7 +113,7 @@ public class JsonTests
 
         Assert.That(sut,
             Throws
-                .TypeOf<JsonException>().And
+                .TypeOf<JsonParseException>().And
                 .Message.EqualTo(message)
         );
     }
@@ -157,7 +156,7 @@ public class JsonTests
 
         Assert.That(sut,
             Throws
-                .TypeOf<JsonException>().And
+                .TypeOf<JsonParseException>().And
                 .Message.EqualTo(message)
         );
     }
@@ -191,7 +190,7 @@ public class JsonTests
 
         Assert.That(sut,
             Throws
-                .TypeOf<JsonException>().And
+                .TypeOf<JsonParseException>().And
                 .Message.EqualTo(message)
         );
     }
@@ -232,7 +231,7 @@ public class JsonTests
 
         Assert.That(sut,
             Throws
-                .TypeOf<JsonException>().And
+                .TypeOf<JsonParseException>().And
                 .Message.EqualTo(message)
         );
     }
@@ -245,7 +244,7 @@ public class JsonTests
 
         Assert.That(sut,
             Throws
-                .TypeOf<JsonException>().And
+                .TypeOf<JsonParseException>().And
                 .Message.EqualTo(message)
         );
     }

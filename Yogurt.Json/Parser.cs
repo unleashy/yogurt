@@ -486,92 +486,92 @@ internal ref struct Parser
 
     private char Current => (char)_s[0];
 
-    private JsonException ErrorEmpty() =>
+    private JsonParseException ErrorEmpty() =>
         Error("Unexpected end of input: no JSON value found");
 
-    private JsonException ErrorUnexpected(char c) =>
+    private JsonParseException ErrorUnexpected(char c) =>
         Error($"Unexpected character '{c}'");
 
-    private JsonException ErrorTrailingData() =>
+    private JsonParseException ErrorTrailingData() =>
         Error("Unexpected trailing content after JSON value");
 
-    private JsonException ErrorTooDeep() =>
+    private JsonParseException ErrorTooDeep() =>
         Error($"Maximum nesting depth of {JsonValue.MaxDepth} exceeded");
 
-    private JsonException ErrorUnclosedObject() =>
+    private JsonParseException ErrorUnclosedObject() =>
         Error("Unexpected end of input: unclosed object");
 
-    private JsonException ErrorMissingObjectComma(char c) =>
+    private JsonParseException ErrorMissingObjectComma(char c) =>
         Error($"Expected ',' or '}}' after value in object; found '{c}'");
 
-    private JsonException ErrorInvalidObjectKey(char c) =>
+    private JsonParseException ErrorInvalidObjectKey(char c) =>
         Error($"Object keys must be strings; found '{c}'");
 
-    private JsonException ErrorMissingObjectColon(char c) =>
+    private JsonParseException ErrorMissingObjectColon(char c) =>
         Error($"Expected ':' after object key; found '{c}'");
 
-    private JsonException ErrorUnclosedArray() =>
+    private JsonParseException ErrorUnclosedArray() =>
         Error("Unexpected end of input: unclosed array");
 
-    private JsonException ErrorTrailingComma() =>
+    private JsonParseException ErrorTrailingComma() =>
         Error("Trailing comma is not allowed");
 
-    private JsonException ErrorMissingArrayComma(char c) =>
+    private JsonParseException ErrorMissingArrayComma(char c) =>
         Error($"Expected ',' or ']' after value in array; found '{c}'");
 
-    private JsonException ErrorLeadingZero() =>
+    private JsonParseException ErrorLeadingZero() =>
         Error("Invalid number: leading zero is not allowed");
 
-    private JsonException ErrorLeadingDecPoint() =>
+    private JsonParseException ErrorLeadingDecPoint() =>
         Error("Invalid number: leading decimal point is not allowed");
 
-    private JsonException ErrorMissingNegDigit() =>
+    private JsonParseException ErrorMissingNegDigit() =>
         Error("Invalid number: expected digit after negative sign '-'");
 
-    private JsonException ErrorMissingFracDigit() =>
+    private JsonParseException ErrorMissingFracDigit() =>
         Error("Invalid number: expected digit after decimal point '.'");
 
-    private JsonException ErrorMissingExpDigit() =>
+    private JsonParseException ErrorMissingExpDigit() =>
         Error("Invalid number: expected digit after exponent");
 
-    private JsonException ErrorUnterminatedString() =>
+    private JsonParseException ErrorUnterminatedString() =>
         Error("Unterminated string");
 
-    private JsonException ErrorControlChar(char c) =>
+    private JsonParseException ErrorControlChar(char c) =>
         Error($@"Unescaped control character '\x{(ushort)c:X2}' in string");
 
-    private JsonException ErrorUnterminatedEscape() =>
+    private JsonParseException ErrorUnterminatedEscape() =>
         Error("Unexpected end of input while parsing escape sequence");
 
-    private JsonException ErrorInvalidEscape(char c) =>
+    private JsonParseException ErrorInvalidEscape(char c) =>
         Error($@"Invalid escape sequence '\{c}' in string");
 
-    private JsonException ErrorShortUnicodeEscape(int n) =>
+    private JsonParseException ErrorShortUnicodeEscape(int n) =>
         Error($"Invalid Unicode escape sequence: expected 4 hexadecimal digits; found {n}");
 
-    private JsonException ErrorLoneLowSurrogateEscape(char c) =>
+    private JsonParseException ErrorLoneLowSurrogateEscape(char c) =>
         Error(
             $@"Invalid Unicode escape sequence: unexpected low surrogate '\u{(ushort)c:X4}' not " +
             $"following a high surrogate"
         );
 
-    private JsonException ErrorLoneHighSurrogateEscape(char c) =>
+    private JsonParseException ErrorLoneHighSurrogateEscape(char c) =>
         Error(
             $@"Invalid Unicode escape sequence: expected high surrogate '\u{(ushort)c:X4}' to " +
             $"be paired with a low surrogate"
         );
 
-    private JsonException ErrorBadSurrogatePair(char highCh, char lowCh) =>
+    private JsonParseException ErrorBadSurrogatePair(char highCh, char lowCh) =>
         Error(
             $"Invalid Unicode escape sequence: expected high surrogate " +
             $@"'\u{(ushort)highCh:X4}' to be followed by a low surrogate; " +
             $@"found '\u{(ushort)lowCh:X4}'"
         );
 
-    private JsonException Error(string message)
+    private JsonParseException Error(string message)
     {
         var (line, column) = GetLineAndColumn(_text, _s);
-        return new JsonException(message, path: null, lineNumber: line, bytePositionInLine: column);
+        return new JsonParseException(message, line, column);
     }
 
     private static (int, int) GetLineAndColumn(ReadOnlySpan<byte> start, ReadOnlySpan<byte> end)
