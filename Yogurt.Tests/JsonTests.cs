@@ -1,18 +1,13 @@
-﻿using System.Text;
-using Yogurt.Json;
+﻿using Yogurt.Json;
 
 namespace Yogurt.Tests;
 
 public class JsonTests
 {
-    private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
-
-    private static JsonValue Parse(string s) => JsonValue.Parse(Utf8.GetBytes(s));
-
     [Test]
     public void Empty()
     {
-        var sut = () => Parse("");
+        var sut = () => JsonValue.Parse("");
 
         Assert.That(
             sut,
@@ -25,7 +20,7 @@ public class JsonTests
     [Test]
     public void Null()
     {
-        var sut = Parse("null");
+        var sut = JsonValue.Parse("null");
 
         Assert.That(sut.TryNull(), Is.True);
     }
@@ -34,7 +29,7 @@ public class JsonTests
     [TestCase("false", false)]
     public void Booleans(string input, bool expected)
     {
-        var sut = Parse(input);
+        var sut = JsonValue.Parse(input);
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(sut.TryBoolean(), Is.EqualTo(expected));
@@ -53,7 +48,7 @@ public class JsonTests
     [TestCase(@"bunny: \uD83D\uDC07!", "bunny: 🐇!")]
     public void Strings(string raw, string interpreted)
     {
-        var sut = Parse($"\"{raw}\"");
+        var sut = JsonValue.Parse($"\"{raw}\"");
 
         Assert.That(sut.TryString(), Is.EqualTo(interpreted));
     }
@@ -109,7 +104,7 @@ public class JsonTests
     )]
     public void StringsInvalid(string raw, string message)
     {
-        var sut = () => Parse(raw);
+        var sut = () => JsonValue.Parse(raw);
 
         Assert.That(sut,
             Throws
@@ -134,7 +129,7 @@ public class JsonTests
     [TestCase("100000e0")]
     public void Numbers(string input)
     {
-        var sut = Parse(input);
+        var sut = JsonValue.Parse(input);
 
         var result = sut.TryNumber();
 
@@ -152,7 +147,7 @@ public class JsonTests
     [TestCase("1e-", "Invalid number: expected digit after exponent")]
     public void NumbersInvalid(string input, string message)
     {
-        var sut = () => Parse(input);
+        var sut = () => JsonValue.Parse(input);
 
         Assert.That(sut,
             Throws
@@ -166,7 +161,7 @@ public class JsonTests
     [TestCase("[1, 2, 3]", new[] { 1, 2, 3 })]
     public void Arrays(string input, int[] values)
     {
-        var sut = Parse(input);
+        var sut = JsonValue.Parse(input);
 
         var result = new List<int>();
         if (sut.TryArray()) {
@@ -186,7 +181,7 @@ public class JsonTests
     [TestCase("[1 2]", "Expected ',' or ']' after value in array; found '2'")]
     public void ArraysInvalid(string input, string message)
     {
-        var sut = () => Parse(input);
+        var sut = () => JsonValue.Parse(input);
 
         Assert.That(sut,
             Throws
@@ -202,7 +197,7 @@ public class JsonTests
     public void Objects(string input, string[] keys, int[] values)
     {
         var entries = keys.Zip(values).ToArray();
-        var sut = Parse(input);
+        var sut = JsonValue.Parse(input);
 
         var result = new List<(string, int)>();
         if (sut.TryObject()) {
@@ -227,7 +222,7 @@ public class JsonTests
     [TestCase("""{"" 1}""", "Expected ':' after object key; found '1'")]
     public void ObjectsInvalid(string input, string message)
     {
-        var sut = () => Parse(input);
+        var sut = () => JsonValue.Parse(input);
 
         Assert.That(sut,
             Throws
@@ -240,7 +235,7 @@ public class JsonTests
     [TestCase("[][]", "Unexpected trailing content after JSON value")]
     public void TrailingData(string input, string message)
     {
-        var sut = () => Parse(input);
+        var sut = () => JsonValue.Parse(input);
 
         Assert.That(sut,
             Throws

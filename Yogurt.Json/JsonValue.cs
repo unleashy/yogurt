@@ -16,6 +16,8 @@ public sealed class JsonValue
 
     private TokenSlice _s;
 
+    public static JsonValue Parse(string text) => Parse(Utf8.GetBytes(text));
+
     public static JsonValue Parse(ReadOnlyMemory<byte> text) => new(Parser.Parse(text));
 
     private JsonValue(TokenSlice s)
