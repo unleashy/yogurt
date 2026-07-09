@@ -259,10 +259,43 @@ public class JsonTests
         Action sut = () => JsonValue.Parse(input);
 
         using (Assert.EnterMultipleScope()) {
-            var jpe = Assert.Throws<JsonParseException>(sut);
+            var jpe = Assert.Throws<JsonParseException>(sut)!;
 
             Assert.That(jpe.Line, Is.EqualTo(line));
             Assert.That(jpe.Column, Is.EqualTo(column));
+        }
+    }
+
+    [Test]
+    public void ValueExtraction()
+    {
+        var sut = JsonValue.Parse(
+            """
+            [ null
+            , true
+            , 42
+            , "abc"
+            , [1, [2], [3]]
+            , { "key": "value"
+              , "nest": { "is": { "ok": true } } } ]
+            """);
+
+        var values = new List<JsonValue>();
+        if (sut.TryArray()) {
+            while (sut.TryArrayElement()) {
+                if (sut.TryValue() is {} value) values.Add(value);
+            }
+        }
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(sut.TryValue(), Is.Null);
+
+            Assert.That(values[0].TryNull(), Is.True);
+            Assert.That(values[1].TryBoolean(), Is.True);
+            Assert.That(values[2].TryNumber(), Is.EqualTo("42"));
+            Assert.That(values[3].TryString(), Is.EqualTo("abc"));
+            Assert.That(values[4].TryArray(), Is.True);
+            Assert.That(values[5].TryObject(), Is.True);
         }
     }
 }

@@ -103,7 +103,7 @@ public sealed class JsonValue
 
         var buffer = new StringBuilder();
 
-        foreach (var escape in escapes) {
+        foreach (var escape in escapes.Span) {
             var prev = _s.Text.Span[start .. escape.Offset];
             start = escape.Offset + escape.Length;
 
@@ -212,6 +212,42 @@ public sealed class JsonValue
         var key = TryString();
         Debug.Assert(key is not null);
         return key;
+    }
+
+    [PublicAPI]
+    public JsonValue? TryValue()
+    {
+        if (_s.First is not {} token) return null;
+
+        // ReSharper disable once SwitchStatementHandlesSomeKnownEnumValuesWithDefault
+        switch (token.Kind) {
+            case TokenKind.Null:
+            case TokenKind.BoolTrue:
+            case TokenKind.BoolFalse:
+            case TokenKind.Number:
+            case TokenKind.StringSimple: {
+                (var slice, _s) = _s.SplitAt(1);
+                return new JsonValue(slice);
+            }
+
+            case TokenKind.StringComplexStart: {
+                (var slice, _s) = _s.FindSplit(TokenKind.StringComplexEnd);
+                return new JsonValue(slice);
+            }
+
+            case TokenKind.ArrayOpen: {
+                (var slice, _s) = _s.FindSplitBalanced(TokenKind.ArrayClose);
+                return new JsonValue(slice);
+            }
+
+            case TokenKind.ObjectOpen: {
+                (var slice, _s) = _s.FindSplitBalanced(TokenKind.ObjectClose);
+                return new JsonValue(slice);
+            }
+
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
     }
 
     private ReadOnlySpan<byte> TokenText(Token token) =>
