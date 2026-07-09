@@ -8,14 +8,17 @@ internal sealed class Cli
 {
     public readonly struct Parsing(Cli cli, ParseResult parseResult)
     {
+        [PublicAPI]
         public bool TryInvokeAction(out int exitCode)
         {
             exitCode = parseResult.Invoke();
             return parseResult.Action is not null;
         }
 
+        [PublicAPI]
         public uint? ClientProcessId => parseResult.GetValue(cli._clientProcessId);
 
+        [PublicAPI]
         public TransportOption Transport {
             get {
                 Debug.Assert(!cli.HasConflictingTransportOptions(parseResult.RootCommandResult));
@@ -33,6 +36,7 @@ internal sealed class Cli
         }
     }
 
+    [PublicAPI]
     public abstract record TransportOption
     {
         public sealed record Console : TransportOption;
@@ -70,6 +74,7 @@ internal sealed class Cli
         HelpName = "port",
     };
 
+    [PublicAPI]
     public static Parsing Parse(IReadOnlyList<string> args)
     {
         var cli = new Cli();
