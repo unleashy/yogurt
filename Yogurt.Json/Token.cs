@@ -22,11 +22,7 @@ internal readonly record struct Token(TokenKind Kind, int Offset, int Length);
 
 internal readonly record struct TokenSlice(ReadOnlyMemory<byte> Text, ReadOnlyMemory<Token> Tokens)
 {
-    public bool IsEmpty => Tokens.Length == 0;
-
     public Token? First => IsEmpty ? null : Tokens.Span[0];
-
-    public TokenSlice Slice(int start) => new(Text, Tokens[start ..]);
 
     public TokenSlice Skip() => IsEmpty ? this : Slice(1);
 
@@ -66,4 +62,8 @@ internal readonly record struct TokenSlice(ReadOnlyMemory<byte> Text, ReadOnlyMe
         result = span[.. i];
         return (Slice(i + 1), span[i]);
     }
+
+    private bool IsEmpty => Tokens.Length == 0;
+
+    private TokenSlice Slice(int start) => new(Text, Tokens[start ..]);
 }
