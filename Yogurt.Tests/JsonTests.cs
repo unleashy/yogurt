@@ -243,4 +243,26 @@ public class JsonTests
                 .Message.EqualTo(message)
         );
     }
+
+    [TestCase("", 0, 0)]
+    [TestCase("{", 0, 1)]
+    [TestCase("{,}", 0, 1)]
+    [TestCase("{\n  \"a\": 1,\n}", 2, 0)]
+    [TestCase("{\r\n  \"a\": 1,\r\n}", 2, 0)]
+    [TestCase("\n\n\n{bad}", 3, 1)]
+    [TestCase("""{"a": "unterminated}""", 0, 6)]
+    [TestCase("\"first line\nsecond line\"", 0, 11)]
+    [TestCase("\"a\\qb\"", 0, 3)]
+    [TestCase("\n[\"🩻\", Utf8]", 1, 9)]
+    public void LineColumnTracking(string input, int line, int column)
+    {
+        Action sut = () => JsonValue.Parse(input);
+
+        using (Assert.EnterMultipleScope()) {
+            var jpe = Assert.Throws<JsonParseException>(sut);
+
+            Assert.That(jpe.Line, Is.EqualTo(line));
+            Assert.That(jpe.Column, Is.EqualTo(column));
+        }
+    }
 }

@@ -254,7 +254,7 @@ internal ref struct Parser
 
         var nextIndex = _s.IndexOfAny(RelevantStringChars);
         if (nextIndex == -1) {
-            throw ErrorUnterminatedString();
+            throw ErrorUnterminatedString(start);
         }
 
         if (_s[nextIndex] == '"') {
@@ -288,14 +288,14 @@ internal ref struct Parser
 
                 default: {
                     Debug.Assert(ch <= '\x1F');
-                    throw ErrorControlChar(ch);
+                    throw ErrorControlChar(ch, start);
                 }
             }
 
             nextIndex = _s.IndexOfAny(RelevantStringChars);
         }
 
-        throw ErrorUnterminatedString();
+        throw ErrorUnterminatedString(start);
     }
 
     private Token InterpretEscape(ReadOnlySpan<byte> start)
@@ -534,11 +534,11 @@ internal ref struct Parser
     private JsonParseException ErrorMissingExpDigit() =>
         Error("Invalid number: expected digit after exponent");
 
-    private JsonParseException ErrorUnterminatedString() =>
-        Error("Unterminated string");
+    private JsonParseException ErrorUnterminatedString(ReadOnlySpan<byte> start) =>
+        Error("Unterminated string", start);
 
-    private JsonParseException ErrorControlChar(char c) =>
-        Error($@"Unescaped control character '\x{(ushort)c:X2}' in string");
+    private JsonParseException ErrorControlChar(char c, ReadOnlySpan<byte> start) =>
+        Error($@"Unescaped control character '\x{(ushort)c:X2}' in string", start);
 
     private JsonParseException ErrorUnterminatedEscape() =>
         Error("Unexpected end of input while parsing escape sequence");
@@ -568,9 +568,11 @@ internal ref struct Parser
             $@"found '\u{(ushort)lowCh:X4}'"
         );
 
-    private JsonParseException Error(string message)
+    private JsonParseException Error(string message) => Error(message, _s);
+
+    private JsonParseException Error(string message, ReadOnlySpan<byte> start)
     {
-        var (line, column) = GetLineAndColumn(_text, _s);
+        var (line, column) = GetLineAndColumn(_text, start);
         return new JsonParseException(message, line, column);
     }
 
@@ -580,7 +582,7 @@ internal ref struct Parser
         var column = 0;
 
         var offset = start.Length - end.Length;
-        for (var i = 1; i < offset; ++i) {
+        for (var i = 1; i <= offset; ++i) {
             ++column;
 
             if (start[i - 1] == '\n') {
