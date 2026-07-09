@@ -16,4 +16,12 @@
 
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="JetBrains.Annotations"/>
+  </ItemGroup>
 </Project>

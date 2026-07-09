@@ -2,7 +2,6 @@
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using JetBrains.Annotations;
 
 namespace Yogurt.Json;
 

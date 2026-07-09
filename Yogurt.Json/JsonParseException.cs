@@ -1,6 +1,4 @@
-﻿using JetBrains.Annotations;
-
-namespace Yogurt.Json;
+﻿namespace Yogurt.Json;
 
 public sealed class JsonParseException(string message, int line, int column) : Exception(message)
 {
