@@ -43,7 +43,10 @@ public sealed class ProtocolListener(PipeReader reader) : IProtocolListener
                 );
             }
 
-            return new ProtocolMessage(buffer.Slice(0, contentLength).ToArray());
+            var text = buffer.Slice(0, contentLength).ToArray();
+            return Utf8.IsValid(text)
+                ? new ProtocolMessage(text)
+                : throw new InvalidDataException("Invalid content: malformed UTF-8");
         }
         finally {
             // the consumed range depends on the success or failure of the content read:

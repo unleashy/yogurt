@@ -221,6 +221,23 @@ public class ProtocolListenerTests
         }
     }
 
+    [Test]
+    public async Task InvalidUtf8()
+    {
+        var headers = "Content-Length: 3\r\n\r\n"u8.ToArray();
+        var content = new byte[] { 0xF0, 0x9F, 0x98 };
+
+        var reader = FakePipeReader([headers.Concat(content).ToArray()]);
+        var sut = new ProtocolListener(reader);
+
+        await Assert.ThatAsync(
+            () => sut.Listen().ToArrayAsync().AsTask(),
+            Throws
+                .TypeOf<InvalidDataException>().And
+                .Message.EqualTo("Invalid content: malformed UTF-8")
+        );
+    }
+
     private static PipeReader FakePipeReader(byte[][] rawChunks) =>
         PipeReader.Create(new ChunkyStream(rawChunks));
 
