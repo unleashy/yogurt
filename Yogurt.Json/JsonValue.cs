@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Numerics;
 using System.Text;
+using JetBrains.Annotations;
 
 namespace Yogurt.Json;
 
@@ -16,8 +17,10 @@ public sealed class JsonValue
 
     private TokenSlice _s;
 
+    [PublicAPI]
     public static JsonValue Parse(string text) => Parse(Utf8.GetBytes(text));
 
+    [PublicAPI]
     public static JsonValue Parse(ReadOnlyMemory<byte> text) => new(Parser.Parse(text));
 
     private JsonValue(TokenSlice s)
@@ -25,12 +28,14 @@ public sealed class JsonValue
         _s = s;
     }
 
+    [PublicAPI]
     public bool TryNull()
     {
         _s = _s.SkipIf(TokenKind.Null, out var hadNull);
         return hadNull;
     }
 
+    [PublicAPI]
     public bool? TryBoolean()
     {
         _s = _s.SkipIf(TokenKind.BoolTrue, out var hadTrue, TokenKind.BoolFalse, out var hadFalse);
@@ -40,12 +45,14 @@ public sealed class JsonValue
             : null;
     }
 
+    [PublicAPI]
     public string? TryNumber()
     {
         (_s, var result) = _s.SkipIf(TokenKind.Number);
         return result is {} token ? TokenTextAsString(token) : null;
     }
 
+    [PublicAPI]
     public T? TryNumber<T>()
         where T : struct, INumberBase<T>
     {
@@ -61,6 +68,7 @@ public sealed class JsonValue
             : null;
     }
 
+    [PublicAPI]
     public string? TryString()
     {
         switch (_s.First) {
@@ -175,24 +183,28 @@ public sealed class JsonValue
     }
     #endregion String handling
 
+    [PublicAPI]
     public bool TryArray()
     {
         _s = _s.SkipIf(TokenKind.ArrayOpen, out var hadArrayOpen);
         return hadArrayOpen;
     }
 
+    [PublicAPI]
     public bool TryArrayElement()
     {
         _s = _s.SkipIf(TokenKind.ArrayClose, out var hadArrayClose);
         return !hadArrayClose;
     }
 
+    [PublicAPI]
     public bool TryObject()
     {
         _s = _s.SkipIf(TokenKind.ObjectOpen, out var hadObjectOpen);
         return hadObjectOpen;
     }
 
+    [PublicAPI]
     public string? TryObjectKey()
     {
         _s = _s.SkipIf(TokenKind.ObjectClose, out var hadObjectClose);
