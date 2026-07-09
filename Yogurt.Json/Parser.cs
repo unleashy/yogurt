@@ -1,11 +1,9 @@
-﻿using System.Buffers;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.Json;
 
 namespace Yogurt.Json;
 
@@ -252,7 +250,7 @@ internal ref struct Parser
         var quote = Skip('"');
         Debug.Assert(quote);
 
-        var nextIndex = _s.IndexOfAny(RelevantStringChars);
+        var nextIndex = _s.IndexOf(IsRelevantStringChar);
         if (nextIndex == -1) {
             throw ErrorUnterminatedString(start);
         }
@@ -292,7 +290,7 @@ internal ref struct Parser
                 }
             }
 
-            nextIndex = _s.IndexOfAny(RelevantStringChars);
+            nextIndex = _s.IndexOf(IsRelevantStringChar);
         }
 
         throw ErrorUnterminatedString(start);
@@ -372,19 +370,7 @@ internal ref struct Parser
         );
     }
 
-    private static readonly SearchValues<byte> RelevantStringChars = SearchValues.Create(
-        // Control characters
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-
-        // Quote
-        0x22,
-
-        // Backslash
-        0x5C
-    );
+    private static bool IsRelevantStringChar(char c) => c is <= '\x1F' or '"' or '\\';
     #endregion String handling
 
     private Token Number(ReadOnlySpan<byte> start)
@@ -396,31 +382,29 @@ internal ref struct Parser
         var negative = Skip('-');
 
         if (Skip('0')) {
-            if (Has(NumberChars)) {
+            if (Has(char.IsAsciiDigit)) {
                 throw ErrorLeadingZero();
             }
         }
-        else if (!SkipWhile(NumberChars) && negative) {
+        else if (!SkipWhile(char.IsAsciiDigit) && negative) {
             throw ErrorMissingNegDigit();
         }
 
         if (Skip('.')) {
-            if (!SkipWhile(NumberChars)) {
+            if (!SkipWhile(char.IsAsciiDigit)) {
                 throw ErrorMissingFracDigit();
             }
         }
 
         if (Skip('e') || Skip('E')) {
             _ = Skip('+') || Skip('-');
-            if (!SkipWhile(NumberChars)) {
+            if (!SkipWhile(char.IsAsciiDigit)) {
                 throw ErrorMissingExpDigit();
             }
         }
 
         return Token(TokenKind.Number, start);
     }
-
-    private static readonly SearchValues<byte> NumberChars = SearchValues.Create("0123456789"u8);
 
     private Token Token(TokenKind kind, ReadOnlySpan<byte> start)
     {
@@ -434,10 +418,17 @@ internal ref struct Parser
         _s = _s.TrimStart(" \n\r\t"u8);
     }
 
-    private bool SkipWhile(SearchValues<byte> values)
+    private bool SkipWhile(Predicate<char> predicate)
     {
-        var cutoff = _s.IndexOfAnyExcept(values);
-        if (cutoff == -1) cutoff = _s.Length;
+        var cutoff = 0;
+        while (cutoff < _s.Length) {
+            if (predicate((char)_s[cutoff])) {
+                ++cutoff;
+            }
+            else {
+                break;
+            }
+        }
 
         _s = _s[cutoff ..];
         return cutoff != 0;
@@ -469,7 +460,7 @@ internal ref struct Parser
 
     private bool Has(ReadOnlySpan<byte> prefix) => _s.StartsWith(prefix);
 
-    private bool Has(SearchValues<byte> values) => _s.Length > 0 && values.Contains(_s[0]);
+    private bool Has(Predicate<char> predicate) => !IsEmpty && predicate(Current);
 
     private void Advance()
     {
@@ -592,5 +583,19 @@ internal ref struct Parser
         }
 
         return (line, column);
+    }
+}
+
+file static class SpanExtensions
+{
+    public static int IndexOf(this ReadOnlySpan<byte> span, Func<char, bool> predicate)
+    {
+        for (var i = 0; i < span.Length; ++i) {
+            if (predicate((char)span[i])) {
+                return i;
+            }
+        }
+
+        return -1;
     }
 }
