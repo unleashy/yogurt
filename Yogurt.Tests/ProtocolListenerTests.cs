@@ -6,6 +6,10 @@ namespace Yogurt.Tests;
 
 public class ProtocolListenerTests
 {
+    private static readonly ProtocolMessageTestEqualityComparer Eq = new();
+
+    private static ProtocolMessage Message(string s) => new(Encoding.UTF8.GetBytes(s));
+
     [Test]
     public async Task Empty()
     {
@@ -25,7 +29,7 @@ public class ProtocolListenerTests
 
         var result = await sut.Listen().ToArrayAsync();
 
-        Assert.That(result, Is.EqualTo([new ProtocolMessage("abcd")]));
+        Assert.That(result, Is.EqualTo([Message("abcd")]).Using(Eq));
     }
 
     [Test]
@@ -36,7 +40,7 @@ public class ProtocolListenerTests
 
         var result = await sut.Listen().ToArrayAsync();
 
-        Assert.That(result, Is.EqualTo([new ProtocolMessage("🐇")]));
+        Assert.That(result, Is.EqualTo([Message("🐇")]).Using(Eq));
     }
 
     [Test]
@@ -51,7 +55,7 @@ public class ProtocolListenerTests
 
         var result = await sut.Listen().ToArrayAsync();
 
-        Assert.That(result, Is.EqualTo([new ProtocolMessage("🍞")]));
+        Assert.That(result, Is.EqualTo([Message("🍞")]).Using(Eq));
     }
 
     [Test]
@@ -65,9 +69,9 @@ public class ProtocolListenerTests
         var result = await sut.Listen().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
-            new ProtocolMessage("yogurt"),
-            new ProtocolMessage("ice cream"),
-        ]));
+            Message("yogurt"),
+            Message("ice cream"),
+        ]).Using(Eq));
     }
 
     [Test]
@@ -82,9 +86,9 @@ public class ProtocolListenerTests
         var result = await sut.Listen().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
-            new ProtocolMessage("strawberry"),
-            new ProtocolMessage("papaya"),
-        ]));
+            Message("strawberry"),
+            Message("papaya"),
+        ]).Using(Eq));
     }
 
     [Test]
@@ -100,8 +104,8 @@ public class ProtocolListenerTests
         var result = await sut.Listen().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
-            new ProtocolMessage("black forest cake"),
-        ]));
+            Message("black forest cake"),
+        ]).Using(Eq));
     }
 
     [Test]
@@ -116,8 +120,8 @@ public class ProtocolListenerTests
         var result = await sut.Listen().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
-            new ProtocolMessage("scone"),
-        ]));
+            Message("scone"),
+        ]).Using(Eq));
     }
 
     [Test]
@@ -131,8 +135,8 @@ public class ProtocolListenerTests
         var result = await sut.Listen().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
-            new ProtocolMessage(""),
-        ]));
+            Message(""),
+        ]).Using(Eq));
     }
 
     [TestCase("utf-8")]
@@ -149,8 +153,8 @@ public class ProtocolListenerTests
         var result = await sut.Listen().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
-            new ProtocolMessage("doce de leite"),
-        ]));
+            Message("doce de leite"),
+        ]).Using(Eq));
     }
 
     [TestCase("broken", "Invalid message: missing or malformed headers")]
@@ -212,7 +216,7 @@ public class ProtocolListenerTests
         var second = await e.MoveNextAsync();
 
         using (Assert.EnterMultipleScope()) {
-            Assert.That(first, Is.EqualTo(new ProtocolMessage("not cancelled")));
+            Assert.That(first, Is.EqualTo(Message("not cancelled")).Using(Eq));
             Assert.That(second, Is.False);
         }
     }
@@ -264,5 +268,16 @@ internal sealed class ChunkyStream(byte[][] chunks) : Stream
     public override long Position {
         get => throw new NotSupportedException();
         set => throw new NotSupportedException();
+    }
+}
+
+internal sealed class ProtocolMessageTestEqualityComparer : IEqualityComparer<ProtocolMessage>
+{
+    public bool Equals(ProtocolMessage x, ProtocolMessage y) =>
+        x.Utf8Text.Span.SequenceEqual(y.Utf8Text.Span);
+
+    public int GetHashCode(ProtocolMessage obj)
+    {
+        return obj.Utf8Text.Span.GetHashCode();
     }
 }

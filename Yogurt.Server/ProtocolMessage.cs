@@ -1,3 +1,6 @@
 ﻿namespace Yogurt.Server;
 
-public readonly record struct ProtocolMessage(string Content);
+public readonly struct ProtocolMessage(ReadOnlyMemory<byte> utf8Text)
+{
+    public ReadOnlyMemory<byte> Utf8Text { get; } = utf8Text;
+}

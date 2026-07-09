@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Unicode;
 
 namespace Yogurt.Server;
 
@@ -42,8 +43,7 @@ public sealed class ProtocolListener(PipeReader reader) : IProtocolListener
                 );
             }
 
-            var content = Encoding.UTF8.GetString(buffer.Slice(0, contentLength));
-            return new ProtocolMessage(content);
+            return new ProtocolMessage(buffer.Slice(0, contentLength).ToArray());
         }
         finally {
             // the consumed range depends on the success or failure of the content read:
