@@ -1,4 +1,7 @@
-﻿using Yogurt.Json;
+﻿using System.Globalization;
+using System.Numerics;
+using System.Reflection;
+using Yogurt.Json;
 
 namespace Yogurt.Tests;
 
@@ -156,6 +159,53 @@ public class JsonTests
         );
     }
 
+    [TestCaseSource(nameof(NumbersTypedCases))]
+    public void NumbersTyped<T>(T value)
+        where T : struct, INumberBase<T>
+    {
+        var sut = JsonValue.Parse(value.ToString("G", CultureInfo.InvariantCulture));
+
+        var result = sut.TryNumber<T>();
+
+        Assert.That(result, Is.EqualTo(value));
+    }
+
+    private static IEnumerable<TestCaseData> NumbersTypedCases()
+    {
+        Type[] numericTypes = [
+            typeof(byte),
+            typeof(sbyte),
+            typeof(short),
+            typeof(ushort),
+            typeof(int),
+            typeof(uint),
+            typeof(long),
+            typeof(ulong),
+            typeof(float),
+            typeof(double),
+            typeof(decimal),
+        ];
+
+        var method =
+            typeof(JsonTests)
+                .GetMethod(
+                    nameof(NumbersTypedSingleCases),
+                    BindingFlags.NonPublic | BindingFlags.Static
+                )!;
+
+        foreach (var ty in numericTypes) {
+            var e = (IEnumerable<TestCaseData>)method.MakeGenericMethod(ty).Invoke(null, null)!;
+            foreach (var item in e) yield return item;
+        }
+    }
+
+    private static IEnumerable<TestCaseData> NumbersTypedSingleCases<T>()
+        where T : struct, IMinMaxValue<T>
+    {
+        yield return new TestCaseData(T.MaxValue) { TypeArgs = [typeof(T)] };
+        yield return new TestCaseData(T.MinValue) { TypeArgs = [typeof(T)] };
+    }
+
     [TestCase("[]", new int[0])]
     [TestCase("[123]", new[] { 123 })]
     [TestCase("[1, 2, 3]", new[] { 1, 2, 3 })]
@@ -231,8 +281,9 @@ public class JsonTests
         );
     }
 
-    [TestCase("1 2", "Unexpected trailing content after JSON value")]
-    [TestCase("[][]", "Unexpected trailing content after JSON value")]
+    [TestCase("1 2", "Unexpected trailing content after JSON value: '2'")]
+    [TestCase("[][]", "Unexpected trailing content after JSON value: '[]'")]
+    [TestCase("{}{}", "Unexpected trailing content after JSON value: '{}'")]
     public void TrailingData(string input, string message)
     {
         var sut = () => JsonValue.Parse(input);
