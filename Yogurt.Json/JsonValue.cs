@@ -237,6 +237,28 @@ public sealed class JsonValue
     }
 
     [PublicAPI]
+    public T[]? TryArray<T>(Func<JsonValue, T?> parser)
+        where T : struct
+    {
+        if (!TryArray()) return null;
+
+        var save = _s;
+        var xs = new List<T>();
+
+        while (TryArrayElement()) {
+            if (parser(this) is {} value) {
+                xs.Add(value);
+            }
+            else {
+                _s = save;
+                return null;
+            }
+        }
+
+        return xs.ToArray();
+    }
+
+    [PublicAPI]
     public bool TryObject()
     {
         _s = _s.SkipIf(TokenKind.ObjectOpen, out var hadObjectOpen);
@@ -306,12 +328,10 @@ public sealed class JsonValue
     }
 
     [PublicAPI]
-    public JsonValue? TryValue()
+    public JsonValue TryValue()
     {
-        if (_s.First is not {} token) return null;
-
         // ReSharper disable once SwitchStatementHandlesSomeKnownEnumValuesWithDefault
-        switch (token.Kind) {
+        switch (_s.First?.Kind) {
             case TokenKind.Null:
             case TokenKind.BoolTrue:
             case TokenKind.BoolFalse:
@@ -336,8 +356,30 @@ public sealed class JsonValue
                 return new JsonValue(slice);
             }
 
-            default:
-                throw new ArgumentOutOfRangeException();
+            default: {
+                throw new InvalidOperationException("JsonValue is empty");
+            }
+        }
+    }
+
+    [PublicAPI]
+    public JsonValue? TryStructuralValue()
+    {
+        // ReSharper disable once SwitchStatementHandlesSomeKnownEnumValuesWithDefault
+        switch (_s.First?.Kind) {
+            case TokenKind.ArrayOpen: {
+                (var slice, _s) = _s.FindSplitBalanced(TokenKind.ArrayClose);
+                return new JsonValue(slice);
+            }
+
+            case TokenKind.ObjectOpen: {
+                (var slice, _s) = _s.FindSplitBalanced(TokenKind.ObjectClose);
+                return new JsonValue(slice);
+            }
+
+            default: {
+                return null;
+            }
         }
     }
 
