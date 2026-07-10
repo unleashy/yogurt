@@ -183,6 +183,46 @@ public sealed class JsonValue
     #endregion String handling
 
     [PublicAPI]
+    public bool? TryLiteral(bool literal)
+    {
+        var save = _s;
+        if (TryBoolean() is {} value && value == literal) {
+            return value;
+        }
+        else {
+            _s = save;
+            return null;
+        }
+    }
+
+    [PublicAPI]
+    public T? TryLiteral<T>(T literal)
+        where T : struct, INumberBase<T>
+    {
+        var save = _s;
+        if (TryNumber<T>() is {} value && value == literal) {
+            return value;
+        }
+        else {
+            _s = save;
+            return null;
+        }
+    }
+
+    [PublicAPI]
+    public string? TryLiteral(string literal)
+    {
+        var save = _s;
+        if (TryString() is {} value && value == literal) {
+            return value;
+        }
+        else {
+            _s = save;
+            return null;
+        }
+    }
+
+    [PublicAPI]
     public bool TryArray()
     {
         _s = _s.SkipIf(TokenKind.ArrayOpen, out var hadArrayOpen);

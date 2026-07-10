@@ -206,6 +206,39 @@ public class JsonTests
         yield return new TestCaseData(T.MinValue) { TypeArgs = [typeof(T)] };
     }
 
+    [Test]
+    public void Literals()
+    {
+        var sut = JsonValue.Parse("""[true, false, 3.14, "🤓☝️"]""");
+
+        var result = new List<object?>();
+        _ = sut.TryArray();
+        _ = sut.TryArrayElement();
+        result.Add(sut.TryLiteral(true));
+        _ = sut.TryArrayElement();
+        result.Add(sut.TryLiteral(false));
+        _ = sut.TryArrayElement();
+        result.Add(sut.TryLiteral(3.14));
+        _ = sut.TryArrayElement();
+        result.Add(sut.TryLiteral("🤓☝️"));
+
+        Assert.That(result, Is.EqualTo(new object?[] { true, false, 3.14, "🤓☝️" }));
+    }
+
+    [Test]
+    public void LiteralNoMatch()
+    {
+        var sut = JsonValue.Parse("\"string\"");
+
+        var result = sut.TryLiteral("something");
+        var s = sut.TryString();
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(result, Is.Null);
+            Assert.That(s, Is.EqualTo("string"));
+        }
+    }
+
     [TestCase("[]", new int[0])]
     [TestCase("[123]", new[] { 123 })]
     [TestCase("[1, 2, 3]", new[] { 1, 2, 3 })]
