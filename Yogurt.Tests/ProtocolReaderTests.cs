@@ -4,7 +4,7 @@ using Yogurt.Server;
 
 namespace Yogurt.Tests;
 
-public class ProtocolListenerTests
+public class ProtocolReaderTests
 {
     private static readonly ProtocolMessageTestEqualityComparer Eq = new();
 
@@ -14,9 +14,9 @@ public class ProtocolListenerTests
     public async Task Empty()
     {
         var reader = FakePipeReader();
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
-        var result = await sut.Listen().ToArrayAsync();
+        var result = await sut.ReadAllAsync().ToArrayAsync();
 
         Assert.That(result, Is.Empty);
     }
@@ -25,9 +25,9 @@ public class ProtocolListenerTests
     public async Task SingleMessage()
     {
         var reader = FakePipeReader("Content-Length: 4\r\n\r\nabcd");
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
-        var result = await sut.Listen().ToArrayAsync();
+        var result = await sut.ReadAllAsync().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([Message("abcd")]).Using(Eq));
     }
@@ -36,9 +36,9 @@ public class ProtocolListenerTests
     public async Task Utf8Encoding()
     {
         var reader = FakePipeReader("Content-Length: 4\r\n\r\n🐇");
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
-        var result = await sut.Listen().ToArrayAsync();
+        var result = await sut.ReadAllAsync().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([Message("🐇")]).Using(Eq));
     }
@@ -51,9 +51,9 @@ public class ProtocolListenerTests
         var second = new byte[] { 0x8D, 0x9E };
 
         var reader = FakePipeReader([first, second]);
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
-        var result = await sut.Listen().ToArrayAsync();
+        var result = await sut.ReadAllAsync().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([Message("🍞")]).Using(Eq));
     }
@@ -64,9 +64,9 @@ public class ProtocolListenerTests
         var reader = FakePipeReader(
             "Content-Length: 6\r\n\r\nyogurtContent-Length: 9\r\n\r\nice cream"
         );
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
-        var result = await sut.Listen().ToArrayAsync();
+        var result = await sut.ReadAllAsync().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
             Message("yogurt"),
@@ -81,9 +81,9 @@ public class ProtocolListenerTests
             "Content-Length: 10\r\n\r\nstrawberry",
             "Content-Length: 6\r\n\r\npapaya"
         );
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
-        var result = await sut.Listen().ToArrayAsync();
+        var result = await sut.ReadAllAsync().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
             Message("strawberry"),
@@ -99,9 +99,9 @@ public class ProtocolListenerTests
             "Length: 17\r\n\r\nblack f",
             "orest cake"
         );
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
-        var result = await sut.Listen().ToArrayAsync();
+        var result = await sut.ReadAllAsync().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
             Message("black forest cake"),
@@ -115,9 +115,9 @@ public class ProtocolListenerTests
             "Content-Length: 5\r\n",
             "\r\nscone"
         );
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
-        var result = await sut.Listen().ToArrayAsync();
+        var result = await sut.ReadAllAsync().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
             Message("scone"),
@@ -130,9 +130,9 @@ public class ProtocolListenerTests
         var reader = FakePipeReader(
             "Content-Length: 0\r\n\r\n"
         );
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
-        var result = await sut.Listen().ToArrayAsync();
+        var result = await sut.ReadAllAsync().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
             Message(""),
@@ -148,9 +148,9 @@ public class ProtocolListenerTests
             "Content-Length: 13\r\n",
             "\r\ndoce de leite"
         );
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
-        var result = await sut.Listen().ToArrayAsync();
+        var result = await sut.ReadAllAsync().ToArrayAsync();
 
         Assert.That(result, Is.EqualTo([
             Message("doce de leite"),
@@ -171,10 +171,10 @@ public class ProtocolListenerTests
     public async Task InvalidData(string input, string message)
     {
         var reader = FakePipeReader(input);
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
         await Assert.ThatAsync(
-            () => sut.Listen().ToArrayAsync().AsTask(),
+            () => sut.ReadAllAsync().ToArrayAsync().AsTask(),
             Throws
                 .TypeOf<InvalidDataException>().And
                 .Message.EqualTo(message)
@@ -187,11 +187,11 @@ public class ProtocolListenerTests
         var reader = FakePipeReader(
             "Content-Length: 9\r\n\r\ncancelled"
         );
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        var result = await sut.Listen(cts.Token).ToArrayAsync(cts.Token);
+        var result = await sut.ReadAllAsync(cts.Token).ToArrayAsync(cts.Token);
 
         Assert.That(result, Is.Empty);
     }
@@ -203,10 +203,10 @@ public class ProtocolListenerTests
             "Content-Length: 13\r\n\r\nnot cancelled",
             "Content-Length: 9\r\n\r\ncancelled"
         );
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
         using var cts = new CancellationTokenSource();
 
-        var e = sut.Listen(cts.Token).GetAsyncEnumerator(cts.Token);
+        var e = sut.ReadAllAsync(cts.Token).GetAsyncEnumerator(cts.Token);
 
         _ = await e.MoveNextAsync();
         var first = e.Current;
@@ -228,10 +228,10 @@ public class ProtocolListenerTests
         var content = new byte[] { 0xF0, 0x9F, 0x98 };
 
         var reader = FakePipeReader([headers.Concat(content).ToArray()]);
-        var sut = new ProtocolListener(reader);
+        var sut = new ProtocolReader(reader);
 
         await Assert.ThatAsync(
-            () => sut.Listen().ToArrayAsync().AsTask(),
+            () => sut.ReadAllAsync().ToArrayAsync().AsTask(),
             Throws
                 .TypeOf<InvalidDataException>().And
                 .Message.EqualTo("Invalid content: malformed UTF-8")

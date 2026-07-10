@@ -7,9 +7,9 @@ using System.Text.Unicode;
 
 namespace Yogurt.Server;
 
-public sealed class ProtocolListener(PipeReader reader) : IProtocolListener
+public sealed class ProtocolReader(PipeReader reader) : IProtocolReader
 {
-    public async IAsyncEnumerable<ProtocolMessage> Listen(
+    public async IAsyncEnumerable<ProtocolMessage> ReadAllAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )
     {

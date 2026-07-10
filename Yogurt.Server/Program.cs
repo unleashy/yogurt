@@ -13,9 +13,9 @@ var transport = result.Transport switch {
     _ => throw new SwitchExpressionException(result.Transport),
 };
 
-var listener = new ProtocolListener(transport.Input);
+var reader = new ProtocolReader(transport.Input);
 
-await foreach (var message in listener.Listen()) {
+await foreach (var message in reader.ReadAllAsync()) {
     Console.Error.WriteLine(message);
 }
 
