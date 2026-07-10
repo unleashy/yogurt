@@ -275,22 +275,28 @@ public sealed class JsonValue
         if (!TryObject()) return false;
 
         var save = _s;
-        var keys = new HashSet<string>();
+
+        var foundKeys = new HashSet<string>();
+        var rejectedKeys = new HashSet<string>();
         var hadDuplicate = false;
 
         while (TryObjectKey() is {} key) {
-            if (keys.Add(key)) {
-                if (!reader.TryRead(this, key, ref value)) {
-                    _ = TryValue();
+            if (foundKeys.Add(key)) {
+                if (reader.TryRead(this, key, ref value)) {
+                    continue;
+                }
+                else {
+                    _ = rejectedKeys.Add(key);
                 }
             }
             else {
                 hadDuplicate = true;
-                _ = TryValue();
             }
+
+            _ = TryValue();
         }
 
-        if (!hadDuplicate && reader.Complete(keys, ref value)) {
+        if (!hadDuplicate && reader.Complete(foundKeys, rejectedKeys, ref value)) {
             return true;
         }
         else {

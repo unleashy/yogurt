@@ -6,5 +6,9 @@ public interface IJsonObjectReader<T>
     bool TryRead(JsonValue json, string key, scoped ref T value);
 
     [PublicAPI]
-    bool Complete(IReadOnlySet<string> keysFound, scoped ref T value);
+    bool Complete(
+        IReadOnlySet<string> foundKeys,
+        IReadOnlySet<string> rejectedKeys,
+        scoped ref T value
+    );
 }

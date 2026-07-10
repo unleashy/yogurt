@@ -317,7 +317,7 @@ public class JsonTests
     [Test]
     public void ObjectsWithReader()
     {
-        var sut = JsonValue.Parse("""{ "foo": 123, "bar": 456 }""");
+        var sut = JsonValue.Parse("""{ "foo": 123, "bar": 456, "bux": "no" }""");
         var reader = new FakeJsonObjectReader();
 
         var result = sut.TryObject(new Dictionary<string, int>(), reader);
@@ -328,8 +328,35 @@ public class JsonTests
                 ["bar"] = 456,
             }));
 
-            Assert.That(reader.ActualKeysFound, Is.EquivalentTo(reader.ReceivedKeysFound));
+            Assert.That(reader.ActualKeysFound, Is.EquivalentTo(reader.ReceivedFoundKeys));
+            Assert.That(
+                reader.ReceivedRejectedKeys,
+                Is.EquivalentTo(new HashSet<string> { "bux" })
+            );
         }
+    }
+
+    [Test]
+    public void ObjectsWithShapeReader()
+    {
+        var sut = JsonValue.Parse("""{ "foo": 123, "bar": "of gold" }""");
+        var shape = new JsonObjectShape<(int Foo, string? Bar, int? Bux)>()
+            .Require("foo",
+                json => json.TryNumber<int>(),
+                (value, tuple) => (value, tuple.Bar, tuple.Bux)
+            )
+            .Allow("bar",
+                json => json.TryString(),
+                (value, tuple) => (tuple.Foo, value, tuple.Bux)
+            )
+            .Allow("bux",
+                json => json.TryNumber<int>(),
+                (value, tuple) => (tuple.Foo, tuple.Bar, value)
+            );
+
+        var result = sut.TryObject((Foo: -1, Bar: null, Bux: null), shape);
+
+        Assert.That(result, Is.EqualTo((Foo: 123, Bar: "of gold", Bux: (int?)null)));
     }
 
     [TestCase("1 2", "Unexpected trailing content after JSON value: '2'")]
@@ -405,7 +432,8 @@ public class JsonTests
 internal sealed class FakeJsonObjectReader : IJsonObjectReader<Dictionary<string, int>>
 {
     public HashSet<string> ActualKeysFound { get; } = new();
-    public IReadOnlySet<string> ReceivedKeysFound { get; private set; } = new HashSet<string>();
+    public IReadOnlySet<string> ReceivedFoundKeys { get; private set; } = new HashSet<string>();
+    public IReadOnlySet<string> ReceivedRejectedKeys { get; set; } = new HashSet<string>();
 
     public bool TryRead(JsonValue json, string key, scoped ref Dictionary<string, int> value)
     {
@@ -421,11 +449,13 @@ internal sealed class FakeJsonObjectReader : IJsonObjectReader<Dictionary<string
     }
 
     public bool Complete(
-        IReadOnlySet<string> keysFound,
+        IReadOnlySet<string> foundKeys,
+        IReadOnlySet<string> rejectedKeys,
         scoped ref Dictionary<string, int> value
     )
     {
-        ReceivedKeysFound = keysFound;
+        ReceivedFoundKeys = foundKeys;
+        ReceivedRejectedKeys = rejectedKeys;
         return true;
     }
 }
