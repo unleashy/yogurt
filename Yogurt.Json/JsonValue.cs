@@ -255,6 +255,51 @@ public sealed class JsonValue
     }
 
     [PublicAPI]
+    public T? TryObject<T>(T? basis, IJsonObjectReader<T> reader)
+        where T : class
+    {
+        return basis is {} b && TryObject(reader, ref b) ? b : null;
+    }
+
+    [PublicAPI]
+    public T? TryObject<T>(T? basis, IJsonObjectReader<T> reader)
+        where T : struct
+    {
+        return basis is {} b && TryObject(reader, ref b) ? b : null;
+    }
+
+    /// Private implementation of TryObject that correctly handles both struct and class types'
+    /// nullability in all cases by using a ref parameter instead of a T? return
+    private bool TryObject<T>(IJsonObjectReader<T> reader, scoped ref T value)
+    {
+        if (!TryObject()) return false;
+
+        var save = _s;
+        var keys = new HashSet<string>();
+        var hadDuplicate = false;
+
+        while (TryObjectKey() is {} key) {
+            if (keys.Add(key)) {
+                if (!reader.TryRead(this, key, ref value)) {
+                    _ = TryValue();
+                }
+            }
+            else {
+                hadDuplicate = true;
+                _ = TryValue();
+            }
+        }
+
+        if (!hadDuplicate && reader.Complete(keys, ref value)) {
+            return true;
+        }
+        else {
+            _s = save;
+            return false;
+        }
+    }
+
+    [PublicAPI]
     public JsonValue? TryValue()
     {
         if (_s.First is not {} token) return null;

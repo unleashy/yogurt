@@ -314,6 +314,24 @@ public class JsonTests
         );
     }
 
+    [Test]
+    public void ObjectsWithReader()
+    {
+        var sut = JsonValue.Parse("""{ "foo": 123, "bar": 456 }""");
+        var reader = new FakeJsonObjectReader();
+
+        var result = sut.TryObject(new Dictionary<string, int>(), reader);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(result, Is.EqualTo(new Dictionary<string, int> {
+                ["foo"] = 123,
+                ["bar"] = 456,
+            }));
+
+            Assert.That(reader.ActualKeysFound, Is.EquivalentTo(reader.ReceivedKeysFound));
+        }
+    }
+
     [TestCase("1 2", "Unexpected trailing content after JSON value: '2'")]
     [TestCase("[][]", "Unexpected trailing content after JSON value: '[]'")]
     [TestCase("{}{}", "Unexpected trailing content after JSON value: '{}'")]
@@ -381,5 +399,33 @@ public class JsonTests
             Assert.That(values[4].TryArray(), Is.True);
             Assert.That(values[5].TryObject(), Is.True);
         }
+    }
+}
+
+internal sealed class FakeJsonObjectReader : IJsonObjectReader<Dictionary<string, int>>
+{
+    public HashSet<string> ActualKeysFound { get; } = new();
+    public IReadOnlySet<string> ReceivedKeysFound { get; private set; } = new HashSet<string>();
+
+    public bool TryRead(JsonValue json, string key, scoped ref Dictionary<string, int> value)
+    {
+        _ = ActualKeysFound.Add(key);
+
+        if (json.TryNumber<int>() is {} n) {
+            value[key] = n;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    public bool Complete(
+        IReadOnlySet<string> keysFound,
+        scoped ref Dictionary<string, int> value
+    )
+    {
+        ReceivedKeysFound = keysFound;
+        return true;
     }
 }
