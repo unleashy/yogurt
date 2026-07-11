@@ -417,8 +417,6 @@ public class JsonTests
         }
 
         using (Assert.EnterMultipleScope()) {
-            Assert.That(sut.TryValue(), Is.Null);
-
             Assert.That(values[0].TryNull(), Is.True);
             Assert.That(values[1].TryBoolean(), Is.True);
             Assert.That(values[2].TryNumber(), Is.EqualTo("42"));

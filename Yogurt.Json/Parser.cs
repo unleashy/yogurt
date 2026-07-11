@@ -13,7 +13,7 @@ internal ref struct Parser
     {
         var p = new Parser(text.Span);
         p.Parse();
-        return new TokenSlice(text, p.Tokens());
+        return new TokenSlice(p.Tokens());
     }
 
     private readonly ReadOnlySpan<byte> _text;

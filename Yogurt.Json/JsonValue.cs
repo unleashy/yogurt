@@ -14,16 +14,18 @@ public sealed class JsonValue
         throwOnInvalidBytes: true
     );
 
+    private readonly ReadOnlyMemory<byte> _text;
     private TokenSlice _s;
 
     [PublicAPI]
     public static JsonValue Parse(string text) => Parse(Utf8.GetBytes(text));
 
     [PublicAPI]
-    public static JsonValue Parse(ReadOnlyMemory<byte> text) => new(Parser.Parse(text));
+    public static JsonValue Parse(ReadOnlyMemory<byte> text) => new(text, Parser.Parse(text));
 
-    private JsonValue(TokenSlice s)
+    private JsonValue(ReadOnlyMemory<byte> text, TokenSlice s)
     {
+        _text = text;
         _s = s;
     }
 
@@ -104,7 +106,7 @@ public sealed class JsonValue
         var buffer = new StringBuilder();
 
         foreach (var escape in escapes.Span) {
-            var prev = _s.Text.Span[start .. escape.Offset];
+            var prev = _text.Span[start .. escape.Offset];
             start = escape.Offset + escape.Length;
 
             _ = buffer
@@ -112,7 +114,7 @@ public sealed class JsonValue
                 .Append(InterpretEscape(escape.Kind, TokenText(escape)));
         }
 
-        var remainder = _s.Text.Span[start .. end.Offset];
+        var remainder = _text.Span[start .. end.Offset];
         _ = buffer.Append(Utf8.GetString(remainder));
 
         return buffer.ToString();
@@ -338,22 +340,22 @@ public sealed class JsonValue
             case TokenKind.Number:
             case TokenKind.StringSimple: {
                 (var slice, _s) = _s.SplitAt(1);
-                return new JsonValue(slice);
+                return WithSlice(slice);
             }
 
             case TokenKind.StringComplexStart: {
                 (var slice, _s) = _s.FindSplit(TokenKind.StringComplexEnd);
-                return new JsonValue(slice);
+                return WithSlice(slice);
             }
 
             case TokenKind.ArrayOpen: {
                 (var slice, _s) = _s.FindSplitBalanced(TokenKind.ArrayClose);
-                return new JsonValue(slice);
+                return WithSlice(slice);
             }
 
             case TokenKind.ObjectOpen: {
                 (var slice, _s) = _s.FindSplitBalanced(TokenKind.ObjectClose);
-                return new JsonValue(slice);
+                return WithSlice(slice);
             }
 
             default: {
@@ -369,12 +371,12 @@ public sealed class JsonValue
         switch (_s.First?.Kind) {
             case TokenKind.ArrayOpen: {
                 (var slice, _s) = _s.FindSplitBalanced(TokenKind.ArrayClose);
-                return new JsonValue(slice);
+                return WithSlice(slice);
             }
 
             case TokenKind.ObjectOpen: {
                 (var slice, _s) = _s.FindSplitBalanced(TokenKind.ObjectClose);
-                return new JsonValue(slice);
+                return WithSlice(slice);
             }
 
             default: {
@@ -383,8 +385,10 @@ public sealed class JsonValue
         }
     }
 
+    private JsonValue WithSlice(in TokenSlice slice) => new(_text, slice);
+
     private ReadOnlySpan<byte> TokenText(Token token) =>
-        _s.Text.Span.Slice(token.Offset, token.Length);
+        _text.Span.Slice(token.Offset, token.Length);
 
     private string TokenTextAsString(Token token) => Utf8.GetString(TokenText(token));
 }

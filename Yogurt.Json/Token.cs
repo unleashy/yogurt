@@ -20,7 +20,7 @@ internal enum TokenKind : byte
 
 internal readonly record struct Token(TokenKind Kind, int Offset, int Length);
 
-internal readonly record struct TokenSlice(ReadOnlyMemory<byte> Text, ReadOnlyMemory<Token> Tokens)
+internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
 {
     public Token? First => IsEmpty ? null : Tokens.Span[0];
 
@@ -105,7 +105,7 @@ internal readonly record struct TokenSlice(ReadOnlyMemory<byte> Text, ReadOnlyMe
 
     private bool IsEmpty => Tokens.Length == 0;
 
-    private TokenSlice Slice(int start) => new(Text, Tokens[start ..]);
+    private TokenSlice Slice(int start) => new(Tokens[start ..]);
 
-    private TokenSlice Slice(int start, int end) => new(Text, Tokens[start .. end]);
+    private TokenSlice Slice(int start, int end) => new(Tokens[start .. end]);
 }
