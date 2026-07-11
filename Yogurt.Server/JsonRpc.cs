@@ -2,35 +2,6 @@
 
 namespace Yogurt.Server;
 
-public static class JsonRpc
-{
-    [PublicAPI]
-    public static JsonRpcRequest? TryParseRequest(JsonValue json) =>
-        json.TryObject(
-            new JsonRpcRequest(),
-            new JsonObjectShape<JsonRpcRequest>()
-                .Require("jsonrpc", static json => json.TryLiteral("2.0"))
-                .Require("method",
-                    static json => json.TryString(),
-                    static (method, req) => req with { Method = method }
-                )
-                .Allow("id",
-                    TryParseId,
-                    static (id, req) => req with { Id = id }
-                )
-                .Allow("params",
-                    static json => json.TryStructuralValue(),
-                    static (@params, req) => req with { Params = @params }
-                )
-        );
-
-    private static JsonRpcId? TryParseId(JsonValue json) =>
-        json.TryNumber<int>() is {} ival ? JsonRpcId.Int(ival)
-        : json.TryString() is {} sval ? JsonRpcId.String(sval)
-        : json.TryNull() ? JsonRpcId.Null
-        : null;
-}
-
 public readonly struct JsonRpcId : IEquatable<JsonRpcId>
 {
     private enum Repr
@@ -66,6 +37,13 @@ public readonly struct JsonRpcId : IEquatable<JsonRpcId>
     }
 
     [PublicAPI]
+    public static JsonRpcId? TryParse(JsonValue json) =>
+        json.TryNumber<int>() is {} ival ? JsonRpcId.Int(ival)
+        : json.TryString() is {} sval ? JsonRpcId.String(sval)
+        : json.TryNull() ? JsonRpcId.Null
+        : null;
+
+    [PublicAPI]
     public bool Equals(JsonRpcId other) => (_repr, other._repr) switch {
         (Repr.Null,    Repr.Null)    => true,
         (Repr.Integer, Repr.Integer) => _ival == other._ival,
@@ -99,4 +77,25 @@ public readonly struct JsonRpcId : IEquatable<JsonRpcId>
 }
 
 [PublicAPI]
-public readonly record struct JsonRpcRequest(JsonRpcId? Id, string Method, JsonValue? Params);
+public readonly record struct JsonRpcRequest(JsonRpcId? Id, string Method, JsonValue? Params)
+{
+    [PublicAPI]
+    public static JsonRpcRequest? TryParse(JsonValue json) =>
+        json.TryObject(
+            new JsonRpcRequest(),
+            new JsonObjectShape<JsonRpcRequest>()
+                .Require("jsonrpc", static json => json.TryLiteral("2.0"))
+                .Require("method",
+                    static json => json.TryString(),
+                    static (method, req) => req with { Method = method }
+                )
+                .Allow("id",
+                    JsonRpcId.TryParse,
+                    static (id, req) => req with { Id = id }
+                )
+                .Allow("params",
+                    static json => json.TryStructuralValue(),
+                    static (@params, req) => req with { Params = @params }
+                )
+        );
+}

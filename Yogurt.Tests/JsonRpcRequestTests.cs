@@ -16,7 +16,7 @@ public class JsonRpcRequestTests
             """
         );
 
-        var sut = JsonRpc.TryParseRequest(json);
+        var sut = JsonRpcRequest.TryParse(json);
 
         Assert.That(
             sut,
@@ -39,7 +39,7 @@ public class JsonRpcRequestTests
             """
         );
 
-        var sut = JsonRpc.TryParseRequest(json);
+        var sut = JsonRpcRequest.TryParse(json);
 
         Assert.That(
             sut,
@@ -62,7 +62,7 @@ public class JsonRpcRequestTests
             """
         );
 
-        var sut = JsonRpc.TryParseRequest(json);
+        var sut = JsonRpcRequest.TryParse(json);
 
         Assert.That(
             sut,
@@ -84,7 +84,7 @@ public class JsonRpcRequestTests
             """
         );
 
-        var sut = JsonRpc.TryParseRequest(json);
+        var sut = JsonRpcRequest.TryParse(json);
 
         Assert.That(
             sut,
@@ -108,7 +108,7 @@ public class JsonRpcRequestTests
             """
         );
 
-        var sut = JsonRpc.TryParseRequest(json)!.Value;
+        var sut = JsonRpcRequest.TryParse(json)!.Value;
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(sut.Id,     Is.EqualTo(JsonRpcId.Int(123)));
@@ -131,7 +131,7 @@ public class JsonRpcRequestTests
             """
         );
 
-        var sut = JsonRpc.TryParseRequest(json);
+        var sut = JsonRpcRequest.TryParse(json);
 
         Assert.That(sut, Is.Null);
     }
@@ -146,7 +146,7 @@ public class JsonRpcRequestTests
             """
         );
 
-        var sut = JsonRpc.TryParseRequest(json);
+        var sut = JsonRpcRequest.TryParse(json);
 
         Assert.That(sut, Is.Null);
     }
