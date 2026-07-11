@@ -191,9 +191,9 @@ public class ProtocolReaderTests
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        var result = await sut.ReadAllAsync(cts.Token).ToArrayAsync(cts.Token);
+        var task = sut.ReadAllAsync(cts.Token).ToArrayAsync(cts.Token);
 
-        Assert.That(result, Is.Empty);
+        await Assert.ThatAsync(task.AsTask, Throws.InstanceOf<OperationCanceledException>());
     }
 
     [Test]
@@ -213,11 +213,11 @@ public class ProtocolReaderTests
 
         await cts.CancelAsync();
 
-        var second = await e.MoveNextAsync();
+        var second = e.MoveNextAsync();
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(first, Is.EqualTo(Message("not cancelled")).Using(Eq));
-            Assert.That(second, Is.False);
+            await Assert.ThatAsync(second.AsTask, Throws.InstanceOf<OperationCanceledException>());
         }
     }
 

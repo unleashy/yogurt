@@ -13,7 +13,9 @@ public sealed class ProtocolReader(PipeReader reader) : IProtocolReader
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )
     {
-        while (!cancellationToken.IsCancellationRequested) {
+        while (true) {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var contentLength = await ReadHeaders(cancellationToken);
             if (contentLength is null) break;
 
