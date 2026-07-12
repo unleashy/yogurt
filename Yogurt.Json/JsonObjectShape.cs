@@ -2,127 +2,39 @@
 
 public sealed class JsonObjectShape<T> : IJsonObjectReader<T>
 {
-    public delegate TValue? ValueParser<TValue>(in JsonValue json) where TValue : struct;
-    public delegate TValue? Parser<out TValue>(in JsonValue json) where TValue : class;
+    public delegate void Inspector(in JsonValue json);
+    public delegate T Parser(in JsonValue json, T state);
 
-    private delegate bool EntryReader(in JsonValue json, scoped ref T value);
+    private delegate void EntryReader(in JsonValue json, scoped ref T value);
 
     private readonly Dictionary<string, EntryReader> _entries = new();
     private readonly HashSet<string> _requiredKeys = new();
 
     [PublicAPI]
-    public JsonObjectShape<T> Require<TValue>(string key, Parser<TValue> inspector)
-        where TValue : class
+    public JsonObjectShape<T> Require(string key, Inspector inspector)
     {
-        AddRequired(key, (in json, scoped ref _) => inspector(json) is not null);
+        AddRequired(key, (in json, scoped ref _) => inspector(json));
         return this;
     }
 
     [PublicAPI]
-    public JsonObjectShape<T> Require<TValue>(string key, ValueParser<TValue> inspector)
-        where TValue : struct
+    public JsonObjectShape<T> Require(string key, Parser parser)
     {
-        AddRequired(key, (in json, scoped ref _) => inspector(json) is not null);
+        AddRequired(key, (in json, scoped ref value) => value = parser(json, value));
         return this;
     }
 
     [PublicAPI]
-    public JsonObjectShape<T> Require<TValue>(
-        string key,
-        Parser<TValue> parser,
-        Func<TValue, T, T> joiner
-    )
-        where TValue : class
+    public JsonObjectShape<T> Allow(string key, Inspector inspector)
     {
-        AddRequired(key, (in json, scoped ref value) => {
-            if (parser(json) is {} result) {
-                value = joiner(result, value);
-                return true;
-            }
-            else {
-                return false;
-            }
-        });
-
+        AddOptional(key, (in json, scoped ref _) => inspector(json));
         return this;
     }
 
     [PublicAPI]
-    public JsonObjectShape<T> Require<TValue>(
-        string key,
-        ValueParser<TValue> parser,
-        Func<TValue, T, T> joiner
-    )
-        where TValue : struct
+    public JsonObjectShape<T> Allow(string key, Parser parser)
     {
-        AddRequired(key, (in json, scoped ref value) => {
-            if (parser(json) is {} result) {
-                value = joiner(result, value);
-                return true;
-            }
-            else {
-                return false;
-            }
-        });
-
-        return this;
-    }
-
-    [PublicAPI]
-    public JsonObjectShape<T> Allow<TValue>(string key, Parser<TValue> inspector)
-        where TValue : class
-    {
-        AddOptional(key, (in json, scoped ref _) => inspector(json) is not null);
-        return this;
-    }
-
-    [PublicAPI]
-    public JsonObjectShape<T> Allow<TValue>(string key, ValueParser<TValue> inspector)
-        where TValue : struct
-    {
-        AddOptional(key, (in json, scoped ref _) => inspector(json) is not null);
-        return this;
-    }
-
-    [PublicAPI]
-    public JsonObjectShape<T> Allow<TValue>(
-        string key,
-        Parser<TValue> parser,
-        Func<TValue, T, T> joiner
-    )
-        where TValue : class
-    {
-        AddOptional(key, (in json, scoped ref value) => {
-            if (parser(json) is {} result) {
-                value = joiner(result, value);
-                return true;
-            }
-            else {
-                return false;
-            }
-        });
-
-        return this;
-    }
-
-    [PublicAPI]
-    public JsonObjectShape<T> Allow<TValue>(
-        string key,
-        ValueParser<TValue> parser,
-        Func<TValue, T, T> joiner
-    )
-        where TValue : struct
-    {
-        AddOptional(key, (in json, scoped ref value) => {
-            if (parser(json) is {} result) {
-                value = joiner(result, value);
-                return true;
-            }
-            else {
-                return false;
-            }
-        });
-
+        AddOptional(key, (in json, scoped ref value) => value = parser(json, value));
         return this;
     }
 
@@ -139,18 +51,32 @@ public sealed class JsonObjectShape<T> : IJsonObjectReader<T>
 
     bool IJsonObjectReader<T>.TryRead(string key, in JsonValue value, scoped ref T state)
     {
-        return _entries.TryGetValue(key, out var reader) && reader(value, ref state);
+        if (_entries.TryGetValue(key, out var reader)) {
+            reader(value, ref state);
+        }
+        else {
+            throw JsonValueException.Create(value, $"Invalid key {key.JsonEscape()} in object");
+        }
+
+        return true;
     }
 
     bool IJsonObjectReader<T>.Complete(
+        in JsonValue objectValue,
         IReadOnlySet<string> foundKeys,
         IReadOnlySet<string> rejectedKeys,
         scoped ref T state
     )
     {
-        return
-            rejectedKeys.Count == 0
-            && _requiredKeys.IsSubsetOf(foundKeys)
-            && foundKeys.IsSubsetOf(_entries.Keys);
+        var hadAllRequiredKeys = _requiredKeys.IsSubsetOf(foundKeys);
+        if (!hadAllRequiredKeys) {
+            var missing = _requiredKeys.Except(foundKeys).Select(it => it.JsonEscape());
+            throw JsonValueException.Create(
+                objectValue,
+                $"Missing required keys: {string.Join(", ", missing)}"
+            );
+        }
+
+        return rejectedKeys.Count == 0 && hadAllRequiredKeys && foundKeys.IsSubsetOf(_entries.Keys);
     }
 }

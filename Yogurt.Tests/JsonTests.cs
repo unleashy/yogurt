@@ -338,18 +338,9 @@ public class JsonTests
     {
         var sut = JsonValue.Parse("""{ "foo": 123, "bar": "of gold" }""");
         var shape = new JsonObjectShape<(int Foo, string? Bar, int? Bux)>()
-            .Require("foo",
-                static (in json) => json.TryNumber<int>(),
-                (value, tuple) => (value, tuple.Bar, tuple.Bux)
-            )
-            .Allow("bar",
-                static (in json) => json.TryString(),
-                (value, tuple) => (tuple.Foo, value, tuple.Bux)
-            )
-            .Allow("bux",
-                static (in json) => json.TryNumber<int>(),
-                (value, tuple) => (tuple.Foo, tuple.Bar, value)
-            );
+            .Require("foo", (in json, tuple) => (json.Number<int>(), tuple.Bar, tuple.Bux))
+            .Allow("bar", (in json, tuple) => (tuple.Foo, json.String(), tuple.Bux))
+            .Allow("bux", (in json, tuple) => (tuple.Foo, tuple.Bar, json.Number<int>()));
 
         var result = sut.TryObject((Foo: -1, Bar: null, Bux: null), shape);
 
@@ -439,6 +430,7 @@ internal sealed class FakeJsonObjectReader : IJsonObjectReader<Dictionary<string
     }
 
     public bool Complete(
+        in JsonValue objectValue,
         IReadOnlySet<string> foundKeys,
         IReadOnlySet<string> rejectedKeys,
         scoped ref Dictionary<string, int> state

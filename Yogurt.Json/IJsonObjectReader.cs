@@ -7,6 +7,7 @@ public interface IJsonObjectReader<T>
 
     [PublicAPI]
     bool Complete(
+        in JsonValue objectValue,
         IReadOnlySet<string> foundKeys,
         IReadOnlySet<string> rejectedKeys,
         scoped ref T state

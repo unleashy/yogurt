@@ -37,11 +37,14 @@ public readonly struct JsonRpcId : IEquatable<JsonRpcId>
     }
 
     [PublicAPI]
-    public static JsonRpcId? TryParse(in JsonValue json) =>
+    public static JsonRpcId Parse(in JsonValue json) =>
         json.TryNumber<int>() is {} ival ? JsonRpcId.Int(ival)
         : json.TryString() is {} sval ? JsonRpcId.String(sval)
         : json.TryNull() ? JsonRpcId.Null
-        : null;
+        : throw JsonValueException.Create(
+              json,
+              $"Expected a number parseable as Int, string, or null; got {json.HumanTypeName()}"
+          );
 
     [PublicAPI]
     public bool Equals(JsonRpcId other) => (_repr, other._repr) switch {

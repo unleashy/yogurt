@@ -18,9 +18,47 @@ internal enum TokenKind : byte
     ObjectClose,
 }
 
+internal static class TokenKindExtensions
+{
+    public static string HumanName(this TokenKind kind) =>
+        kind switch {
+            TokenKind.Null => "null",
+            TokenKind.BoolTrue => "true",
+            TokenKind.BoolFalse => "false",
+            TokenKind.Number => "number",
+            TokenKind.StringSimple or
+            TokenKind.StringComplexStart or
+            TokenKind.StringComplexEnd => "string",
+            TokenKind.StringEscape => "escape",
+            TokenKind.StringEscapeUnicode or
+            TokenKind.StringEscapeUnicodePair => "unicode escape",
+            TokenKind.ArrayOpen or
+            TokenKind.ArrayClose => "array",
+            TokenKind.ObjectOpen or
+            TokenKind.ObjectClose => "object",
+        };
+}
+
 internal readonly record struct Token(TokenKind Kind, int Offset, int Length)
 {
     public ReadOnlySpan<byte> Text(ReadOnlyMemory<byte> text) => text.Span.Slice(Offset, Length);
+
+    public (int Line, int Column) GetLineAndColumn(ReadOnlySpan<byte> text)
+    {
+        var line = 1;
+        var column = 1;
+
+        for (var i = 1; i <= Offset; ++i) {
+            ++column;
+
+            if (text[i - 1] == '\n') {
+                ++line;
+                column = 1;
+            }
+        }
+
+        return (line, column);
+    }
 }
 
 internal readonly struct TokenSlice
