@@ -8,7 +8,7 @@ namespace Yogurt.Json;
 
 public readonly struct JsonValue
 {
-    internal const int MaxDepth = 128;
+    internal const int MaxDepth = 64;
 
     private static readonly UTF8Encoding Utf8 = new(
         encoderShouldEmitUTF8Identifier: false,
