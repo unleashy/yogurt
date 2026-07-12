@@ -212,15 +212,15 @@ public class JsonTests
         var sut = JsonValue.Parse("""[true, false, 3.14, "🤓☝️"]""");
 
         var result = new List<object?>();
-        _ = sut.TryArray();
-        _ = sut.TryArrayElement();
-        result.Add(sut.TryLiteral(true));
-        _ = sut.TryArrayElement();
-        result.Add(sut.TryLiteral(false));
-        _ = sut.TryArrayElement();
-        result.Add(sut.TryLiteral(3.14));
-        _ = sut.TryArrayElement();
-        result.Add(sut.TryLiteral("🤓☝️"));
+        var e = sut.TryArray()!.Value;
+        _ = e.MoveNext();
+        result.Add(e.Current.TryLiteral(true));
+        _ = e.MoveNext();
+        result.Add(e.Current.TryLiteral(false));
+        _ = e.MoveNext();
+        result.Add(e.Current.TryLiteral(3.14));
+        _ = e.MoveNext();
+        result.Add(e.Current.TryLiteral("🤓☝️"));
 
         Assert.That(result, Is.EqualTo(new object?[] { true, false, 3.14, "🤓☝️" }));
     }
@@ -246,14 +246,10 @@ public class JsonTests
     {
         var sut = JsonValue.Parse(input);
 
-        var result = new List<int>();
-        if (sut.TryArray()) {
-            while (sut.TryArrayElement()) {
-                if (sut.TryNumber<int>() is {} n) {
-                    result.Add(n);
-                }
-            }
-        }
+        var result = sut.TryArray()?
+            .Select(it => it.TryNumber<int>())
+            .OfType<int>()
+            .ToArray();
 
         Assert.That(result, Is.EqualTo(values));
     }
@@ -282,14 +278,15 @@ public class JsonTests
         var entries = keys.Zip(values).ToArray();
         var sut = JsonValue.Parse(input);
 
-        var result = new List<(string, int)>();
-        if (sut.TryObject()) {
-            while (sut.TryObjectKey() is {} key) {
-                if (sut.TryNumber<int>() is {} value) {
-                    result.Add((key, value));
-                }
-            }
-        }
+        var result =
+            sut.TryObject()?
+                .Select(m =>
+                    m.Value.TryNumber<int>() is {} value
+                        ? (m.Key, value)
+                        : ((string, int)?)null
+                )
+                .OfType<(string, int)>()
+                .ToArray();
 
         Assert.That(result, Is.EqualTo(entries));
     }
@@ -342,15 +339,15 @@ public class JsonTests
         var sut = JsonValue.Parse("""{ "foo": 123, "bar": "of gold" }""");
         var shape = new JsonObjectShape<(int Foo, string? Bar, int? Bux)>()
             .Require("foo",
-                json => json.TryNumber<int>(),
+                static (in json) => json.TryNumber<int>(),
                 (value, tuple) => (value, tuple.Bar, tuple.Bux)
             )
             .Allow("bar",
-                json => json.TryString(),
+                static (in json) => json.TryString(),
                 (value, tuple) => (tuple.Foo, value, tuple.Bux)
             )
             .Allow("bux",
-                json => json.TryNumber<int>(),
+                static (in json) => json.TryNumber<int>(),
                 (value, tuple) => (tuple.Foo, tuple.Bar, value)
             );
 
@@ -409,20 +406,15 @@ public class JsonTests
               , "nest": { "is": { "ok": true } } } ]
             """);
 
-        var values = new List<JsonValue>();
-        if (sut.TryArray()) {
-            while (sut.TryArrayElement()) {
-                if (sut.TryValue() is {} value) values.Add(value);
-            }
-        }
+        var values = sut.TryArray()?.ToArray() ?? [];
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(values[0].TryNull(), Is.True);
             Assert.That(values[1].TryBoolean(), Is.True);
             Assert.That(values[2].TryNumber(), Is.EqualTo("42"));
             Assert.That(values[3].TryString(), Is.EqualTo("abc"));
-            Assert.That(values[4].TryArray(), Is.True);
-            Assert.That(values[5].TryObject(), Is.True);
+            Assert.That(values[4].TryArray(), Is.Not.Null);
+            Assert.That(values[5].TryObject(), Is.Not.Null);
         }
     }
 }
@@ -433,12 +425,12 @@ internal sealed class FakeJsonObjectReader : IJsonObjectReader<Dictionary<string
     public IReadOnlySet<string> ReceivedFoundKeys { get; private set; } = new HashSet<string>();
     public IReadOnlySet<string> ReceivedRejectedKeys { get; set; } = new HashSet<string>();
 
-    public bool TryRead(JsonValue json, string key, scoped ref Dictionary<string, int> value)
+    public bool TryRead(string key, in JsonValue value, scoped ref Dictionary<string, int> state)
     {
         _ = ActualKeysFound.Add(key);
 
-        if (json.TryNumber<int>() is {} n) {
-            value[key] = n;
+        if (value.TryNumber<int>() is {} n) {
+            state[key] = n;
             return true;
         }
         else {
@@ -449,7 +441,7 @@ internal sealed class FakeJsonObjectReader : IJsonObjectReader<Dictionary<string
     public bool Complete(
         IReadOnlySet<string> foundKeys,
         IReadOnlySet<string> rejectedKeys,
-        scoped ref Dictionary<string, int> value
+        scoped ref Dictionary<string, int> state
     )
     {
         ReceivedFoundKeys = foundKeys;

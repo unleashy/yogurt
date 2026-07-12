@@ -2,36 +2,39 @@
 
 public sealed class JsonObjectShape<T> : IJsonObjectReader<T>
 {
-    private delegate bool EntryReader(JsonValue json, scoped ref T value);
+    public delegate TValue? ValueParser<TValue>(in JsonValue json) where TValue : struct;
+    public delegate TValue? Parser<out TValue>(in JsonValue json) where TValue : class;
+
+    private delegate bool EntryReader(in JsonValue json, scoped ref T value);
 
     private readonly Dictionary<string, EntryReader> _entries = new();
     private readonly HashSet<string> _requiredKeys = new();
 
     [PublicAPI]
-    public JsonObjectShape<T> Require<TValue>(string key, Func<JsonValue, TValue?> inspector)
+    public JsonObjectShape<T> Require<TValue>(string key, Parser<TValue> inspector)
         where TValue : class
     {
-        AddRequired(key, (json, scoped ref _) => inspector(json) is not null);
+        AddRequired(key, (in json, scoped ref _) => inspector(json) is not null);
         return this;
     }
 
     [PublicAPI]
-    public JsonObjectShape<T> Require<TValue>(string key, Func<JsonValue, TValue?> inspector)
+    public JsonObjectShape<T> Require<TValue>(string key, ValueParser<TValue> inspector)
         where TValue : struct
     {
-        AddRequired(key, (json, scoped ref _) => inspector(json) is not null);
+        AddRequired(key, (in json, scoped ref _) => inspector(json) is not null);
         return this;
     }
 
     [PublicAPI]
     public JsonObjectShape<T> Require<TValue>(
         string key,
-        Func<JsonValue, TValue?> parser,
+        Parser<TValue> parser,
         Func<TValue, T, T> joiner
     )
         where TValue : class
     {
-        AddRequired(key, (json, scoped ref value) => {
+        AddRequired(key, (in json, scoped ref value) => {
             if (parser(json) is {} result) {
                 value = joiner(result, value);
                 return true;
@@ -47,12 +50,12 @@ public sealed class JsonObjectShape<T> : IJsonObjectReader<T>
     [PublicAPI]
     public JsonObjectShape<T> Require<TValue>(
         string key,
-        Func<JsonValue, TValue?> parser,
+        ValueParser<TValue> parser,
         Func<TValue, T, T> joiner
     )
         where TValue : struct
     {
-        AddRequired(key, (json, scoped ref value) => {
+        AddRequired(key, (in json, scoped ref value) => {
             if (parser(json) is {} result) {
                 value = joiner(result, value);
                 return true;
@@ -66,30 +69,30 @@ public sealed class JsonObjectShape<T> : IJsonObjectReader<T>
     }
 
     [PublicAPI]
-    public JsonObjectShape<T> Allow<TValue>(string key, Func<JsonValue, TValue?> inspector)
+    public JsonObjectShape<T> Allow<TValue>(string key, Parser<TValue> inspector)
         where TValue : class
     {
-        AddOptional(key, (json, scoped ref _) => inspector(json) is not null);
+        AddOptional(key, (in json, scoped ref _) => inspector(json) is not null);
         return this;
     }
 
     [PublicAPI]
-    public JsonObjectShape<T> Allow<TValue>(string key, Func<JsonValue, TValue?> inspector)
+    public JsonObjectShape<T> Allow<TValue>(string key, ValueParser<TValue> inspector)
         where TValue : struct
     {
-        AddOptional(key, (json, scoped ref _) => inspector(json) is not null);
+        AddOptional(key, (in json, scoped ref _) => inspector(json) is not null);
         return this;
     }
 
     [PublicAPI]
     public JsonObjectShape<T> Allow<TValue>(
         string key,
-        Func<JsonValue, TValue?> parser,
+        Parser<TValue> parser,
         Func<TValue, T, T> joiner
     )
         where TValue : class
     {
-        AddOptional(key, (json, scoped ref value) => {
+        AddOptional(key, (in json, scoped ref value) => {
             if (parser(json) is {} result) {
                 value = joiner(result, value);
                 return true;
@@ -105,12 +108,12 @@ public sealed class JsonObjectShape<T> : IJsonObjectReader<T>
     [PublicAPI]
     public JsonObjectShape<T> Allow<TValue>(
         string key,
-        Func<JsonValue, TValue?> parser,
+        ValueParser<TValue> parser,
         Func<TValue, T, T> joiner
     )
         where TValue : struct
     {
-        AddOptional(key, (json, scoped ref value) => {
+        AddOptional(key, (in json, scoped ref value) => {
             if (parser(json) is {} result) {
                 value = joiner(result, value);
                 return true;
@@ -134,15 +137,15 @@ public sealed class JsonObjectShape<T> : IJsonObjectReader<T>
         _entries.Add(key, reader);
     }
 
-    bool IJsonObjectReader<T>.TryRead(JsonValue json, string key, scoped ref T value)
+    bool IJsonObjectReader<T>.TryRead(string key, in JsonValue value, scoped ref T state)
     {
-        return _entries.TryGetValue(key, out var reader) && reader(json, ref value);
+        return _entries.TryGetValue(key, out var reader) && reader(value, ref state);
     }
 
     bool IJsonObjectReader<T>.Complete(
         IReadOnlySet<string> foundKeys,
         IReadOnlySet<string> rejectedKeys,
-        scoped ref T value
+        scoped ref T state
     )
     {
         return

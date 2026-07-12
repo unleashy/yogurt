@@ -3,12 +3,12 @@
 public interface IJsonObjectReader<T>
 {
     [PublicAPI]
-    bool TryRead(JsonValue json, string key, scoped ref T value);
+    bool TryRead(string key, in JsonValue value, scoped ref T state);
 
     [PublicAPI]
     bool Complete(
         IReadOnlySet<string> foundKeys,
         IReadOnlySet<string> rejectedKeys,
-        scoped ref T value
+        scoped ref T state
     );
 }

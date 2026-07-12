@@ -10,9 +10,9 @@ public readonly record struct JsonRpcRequest(JsonRpcId? Id, string Method, JsonV
         json.TryObject(
             new JsonRpcRequest(),
             new JsonObjectShape<JsonRpcRequest>()
-                .Require("jsonrpc", static json => json.TryLiteral("2.0"))
+                .Require("jsonrpc", static (in json) => json.TryLiteral("2.0"))
                 .Require("method",
-                    static json => json.TryString(),
+                    static (in json) => json.TryString(),
                     static (method, req) => req with { Method = method }
                 )
                 .Allow("id",
@@ -20,7 +20,7 @@ public readonly record struct JsonRpcRequest(JsonRpcId? Id, string Method, JsonV
                     static (id, req) => req with { Id = id }
                 )
                 .Allow("params",
-                    static json => json.TryStructuralValue(),
+                    static (in json) => json.TryStructuralValue(),
                     static (@params, req) => req with { Params = @params }
                 )
         );

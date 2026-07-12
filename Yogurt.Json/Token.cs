@@ -18,36 +18,29 @@ internal enum TokenKind : byte
     ObjectClose,
 }
 
-internal readonly record struct Token(TokenKind Kind, int Offset, int Length);
+internal readonly record struct Token(TokenKind Kind, int Offset, int Length)
+{
+    public ReadOnlySpan<byte> Text(ReadOnlyMemory<byte> text) => text.Span.Slice(Offset, Length);
+}
 
 internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
 {
     public Token? First => IsEmpty ? null : Tokens.Span[0];
 
-    public TokenSlice Skip() => IsEmpty ? this : Slice(1);
+    public bool Has(TokenKind kind) => First?.Kind == kind;
 
-    public (TokenSlice, Token?) SkipIf(TokenKind kind) =>
-        First is {} it && it.Kind == kind
-            ? (Slice(1), it)
-            : (this, null);
+    public Token? Match(TokenKind kind) =>
+        First is {} token && token.Kind == kind ? token : null;
+
+    public TokenSlice Skip() => IsEmpty ? this : Slice(1);
 
     public TokenSlice SkipIf(TokenKind kind, out bool didSkip)
     {
-        didSkip = First?.Kind == kind;
+        didSkip = Has(kind);
         return didSkip ? Slice(1) : this;
     }
 
-    public TokenSlice SkipIf(
-        TokenKind kind1, out bool didSkip1,
-        TokenKind kind2, out bool didSkip2
-    )
-    {
-        didSkip1 = First?.Kind == kind1;
-        didSkip2 = First?.Kind == kind2;
-        return didSkip1 || didSkip2 ? Slice(1) : this;
-    }
-
-    public (TokenSlice before, TokenSlice after) SplitAt(int i) => (Slice(0, i), Slice(i));
+    public (TokenSlice, TokenSlice) SplitAt(int i) => (Slice(0, i), Slice(i));
 
     public (TokenSlice, TokenSlice) FindSplit(TokenKind needle)
     {
@@ -62,7 +55,7 @@ internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
         return (Slice(0, i), Slice(i + 1));
     }
 
-    public (TokenSlice, Token) FindSplit(TokenKind end, out ReadOnlyMemory<Token> result)
+    public Token FindSplit(TokenKind end, out ReadOnlyMemory<Token> result)
     {
         var span = Tokens.Span;
         var i = 0;
@@ -75,10 +68,10 @@ internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
         }
 
         result = Tokens[.. i];
-        return (Slice(i + 1), span[i]);
+        return span[i];
     }
 
-    public (TokenSlice, TokenSlice) FindSplitBalanced(TokenKind close)
+    public (TokenSlice Before, TokenSlice After) FindSplitBalanced(TokenKind close)
     {
         var span = Tokens.Span;
         if (span.Length == 0) throw new InvalidOperationException("Empty token slice");
@@ -102,6 +95,22 @@ internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
             ? SplitAt(i)
             : throw new InvalidOperationException("Unbalanced token slice");
     }
+
+    public (TokenSlice Before, TokenSlice After) SkipValue() =>
+        First?.Kind switch {
+            TokenKind.Null or
+            TokenKind.BoolTrue or
+            TokenKind.BoolFalse or
+            TokenKind.Number or
+            TokenKind.StringSimple =>
+                SplitAt(1),
+
+            TokenKind.StringComplexStart => FindSplit(TokenKind.StringComplexEnd),
+            TokenKind.ArrayOpen => FindSplitBalanced(TokenKind.ArrayClose),
+            TokenKind.ObjectOpen => FindSplitBalanced(TokenKind.ObjectClose),
+
+            _ => throw new InvalidOperationException("TokenSlice is empty"),
+        };
 
     private bool IsEmpty => Tokens.Length == 0;
 

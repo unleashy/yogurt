@@ -37,7 +37,7 @@ public readonly struct JsonRpcId : IEquatable<JsonRpcId>
     }
 
     [PublicAPI]
-    public static JsonRpcId? TryParse(JsonValue json) =>
+    public static JsonRpcId? TryParse(in JsonValue json) =>
         json.TryNumber<int>() is {} ival ? JsonRpcId.Int(ival)
         : json.TryString() is {} sval ? JsonRpcId.String(sval)
         : json.TryNull() ? JsonRpcId.Null

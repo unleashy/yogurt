@@ -1,11 +1,12 @@
-﻿using System.Diagnostics;
+﻿using System.Collections;
+using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Text;
 
 namespace Yogurt.Json;
 
-public sealed class JsonValue
+public readonly struct JsonValue
 {
     internal const int MaxDepth = 128;
 
@@ -15,7 +16,7 @@ public sealed class JsonValue
     );
 
     private readonly ReadOnlyMemory<byte> _text;
-    private TokenSlice _s;
+    private readonly TokenSlice _s;
 
     [PublicAPI]
     public static JsonValue Parse(string text) => Parse(Utf8.GetBytes(text));
@@ -30,28 +31,17 @@ public sealed class JsonValue
     }
 
     [PublicAPI]
-    public bool TryNull()
-    {
-        _s = _s.SkipIf(TokenKind.Null, out var hadNull);
-        return hadNull;
-    }
+    public bool TryNull() => _s.Has(TokenKind.Null);
 
     [PublicAPI]
-    public bool? TryBoolean()
-    {
-        _s = _s.SkipIf(TokenKind.BoolTrue, out var hadTrue, TokenKind.BoolFalse, out var hadFalse);
-        return
-            hadTrue ? true
-            : hadFalse ? false
-            : null;
-    }
+    public bool? TryBoolean() =>
+        _s.Has(TokenKind.BoolTrue) ? true
+        : _s.Has(TokenKind.BoolFalse) ? false
+        : null;
 
     [PublicAPI]
-    public string? TryNumber()
-    {
-        (_s, var result) = _s.SkipIf(TokenKind.Number);
-        return result is {} token ? TokenTextAsString(token) : null;
-    }
+    public string? TryNumber() =>
+        _s.Match(TokenKind.Number) is {} token ? Utf8.GetString(token.Text(_text)) : null;
 
     [PublicAPI]
     public T? TryNumber<T>()
@@ -72,49 +62,49 @@ public sealed class JsonValue
     [PublicAPI]
     public string? TryString()
     {
-        switch (_s.First) {
-            case { Kind: TokenKind.StringSimple } token: {
-                _s = _s.Skip();
-                return ReadSimpleString(token);
-            }
+        return _s.First switch {
+            { Kind: TokenKind.StringSimple } token =>
+                ReadSimpleString(_text, token),
 
-            case { Kind: TokenKind.StringComplexStart } token: {
-                _s = _s.Skip();
-                return ReadComplexString(token);
-            }
+            { Kind: TokenKind.StringComplexStart } token =>
+                ReadComplexString(_text, _s.Skip(), token),
 
-            default: return null;
-        }
+            _ => null,
+        };
     }
 
     #region String handling
-    private string ReadSimpleString(Token token)
+    private static string ReadSimpleString(ReadOnlyMemory<byte> text, Token token)
     {
         Debug.Assert(token.Kind == TokenKind.StringSimple);
 
         // Get the string by removing the quotes. There are no escapes to handle.
-        return Utf8.GetString(TokenText(token)[1 .. ^1]);
+        return Utf8.GetString(token.Text(text)[1 .. ^1]);
     }
 
-    private string ReadComplexString(Token token)
+    private static string ReadComplexString(
+        ReadOnlyMemory<byte> text,
+        TokenSlice slice,
+        Token token
+    )
     {
         Debug.Assert(token.Kind == TokenKind.StringComplexStart);
 
         var start = token.Offset + 1;
-        (_s, var end) = _s.FindSplit(TokenKind.StringComplexEnd, out var escapes);
+        var end = slice.FindSplit(TokenKind.StringComplexEnd, out var escapes);
 
         var buffer = new StringBuilder();
 
         foreach (var escape in escapes.Span) {
-            var prev = _text.Span[start .. escape.Offset];
+            var prev = text.Span[start .. escape.Offset];
             start = escape.Offset + escape.Length;
 
             _ = buffer
                 .Append(Utf8.GetString(prev))
-                .Append(InterpretEscape(escape.Kind, TokenText(escape)));
+                .Append(InterpretEscape(escape.Kind, escape.Text(text)));
         }
 
-        var remainder = _text.Span[start .. end.Offset];
+        var remainder = text.Span[start .. end.Offset];
         _ = buffer.Append(Utf8.GetString(remainder));
 
         return buffer.ToString();
@@ -185,97 +175,84 @@ public sealed class JsonValue
     #endregion String handling
 
     [PublicAPI]
-    public bool? TryLiteral(bool literal)
-    {
-        var save = _s;
-        if (TryBoolean() is {} value && value == literal) {
-            return value;
-        }
-        else {
-            _s = save;
-            return null;
-        }
-    }
+    public bool? TryLiteral(bool literal) =>
+        TryBoolean() is {} value && value == literal ? value : null;
 
     [PublicAPI]
     public T? TryLiteral<T>(T literal)
         where T : struct, INumberBase<T>
     {
-        var save = _s;
-        if (TryNumber<T>() is {} value && value == literal) {
-            return value;
-        }
-        else {
-            _s = save;
-            return null;
-        }
+        return TryNumber<T>() is {} value && value == literal ? value : null;
     }
 
     [PublicAPI]
-    public string? TryLiteral(string literal)
-    {
-        var save = _s;
-        if (TryString() is {} value && value == literal) {
-            return value;
-        }
-        else {
-            _s = save;
-            return null;
-        }
-    }
+    public string? TryLiteral(string literal) =>
+        TryString() is {} value && value == literal ? value : null;
 
     [PublicAPI]
-    public bool TryArray()
+    public ArrayEnumerator? TryArray()
     {
-        _s = _s.SkipIf(TokenKind.ArrayOpen, out var hadArrayOpen);
-        return hadArrayOpen;
-    }
-
-    [PublicAPI]
-    public bool TryArrayElement()
-    {
-        _s = _s.SkipIf(TokenKind.ArrayClose, out var hadArrayClose);
-        return !hadArrayClose;
+        var slice = _s.SkipIf(TokenKind.ArrayOpen, out var hadArrayOpen);
+        return hadArrayOpen ? new ArrayEnumerator(_text, slice) : null;
     }
 
     [PublicAPI]
     public T[]? TryArray<T>(Func<JsonValue, T?> parser)
         where T : struct
     {
-        if (!TryArray()) return null;
+        return TryArray()?.Select(parser).OfType<T>().ToArray();
+    }
 
-        var save = _s;
-        var xs = new List<T>();
+    public struct ArrayEnumerator : IEnumerator<JsonValue>, IEnumerable<JsonValue>
+    {
+        private readonly ReadOnlyMemory<byte> _text;
+        private TokenSlice _s;
+        private JsonValue? _current;
 
-        while (TryArrayElement()) {
-            if (parser(this) is {} value) {
-                xs.Add(value);
-            }
-            else {
-                _s = save;
-                return null;
-            }
+        internal ArrayEnumerator(ReadOnlyMemory<byte> text, TokenSlice s)
+        {
+            _text = text;
+            _s = s;
+            _current = null;
         }
 
-        return xs.ToArray();
+        [PublicAPI]
+        public bool MoveNext()
+        {
+            if (_s.Has(TokenKind.ArrayClose)) {
+                _current = null;
+                return false;
+            }
+
+            (var token, _s) = _s.SkipValue();
+            _current = new JsonValue(_text, token);
+            return true;
+        }
+
+        [PublicAPI]
+        public JsonValue Current => _current ?? throw new InvalidOperationException();
+
+        [PublicAPI]
+        public ArrayEnumerator GetEnumerator() => new(_text, _s);
+
+        object IEnumerator.Current => Current;
+
+        void IEnumerator.Reset()
+        {
+            throw new NotSupportedException();
+        }
+
+        void IDisposable.Dispose() {}
+
+        IEnumerator<JsonValue> IEnumerable<JsonValue>.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     [PublicAPI]
-    public bool TryObject()
+    public ObjectEnumerator? TryObject()
     {
-        _s = _s.SkipIf(TokenKind.ObjectOpen, out var hadObjectOpen);
-        return hadObjectOpen;
-    }
-
-    [PublicAPI]
-    public string? TryObjectKey()
-    {
-        _s = _s.SkipIf(TokenKind.ObjectClose, out var hadObjectClose);
-        if (hadObjectClose) return null;
-
-        var key = TryString();
-        Debug.Assert(key is not null);
-        return key;
+        var slice = _s.SkipIf(TokenKind.ObjectOpen, out var hadObjectOpen);
+        return hadObjectOpen ? new ObjectEnumerator(_text, slice) : null;
     }
 
     [PublicAPI]
@@ -294,101 +271,88 @@ public sealed class JsonValue
 
     /// Private implementation of TryObject that correctly handles both struct and class types'
     /// nullability in all cases by using a ref parameter instead of a T? return
-    private bool TryObject<T>(IJsonObjectReader<T> reader, scoped ref T value)
+    private bool TryObject<T>(IJsonObjectReader<T> reader, scoped ref T state)
     {
-        if (!TryObject()) return false;
-
-        var save = _s;
+        if (TryObject() is not {} e) return false;
 
         var foundKeys = new HashSet<string>();
         var rejectedKeys = new HashSet<string>();
         var hadDuplicate = false;
 
-        while (TryObjectKey() is {} key) {
+        foreach (var (key, value) in e) {
             if (foundKeys.Add(key)) {
-                if (reader.TryRead(this, key, ref value)) {
-                    continue;
-                }
-                else {
+                if (!reader.TryRead(key, value, ref state)) {
                     _ = rejectedKeys.Add(key);
                 }
             }
             else {
                 hadDuplicate = true;
             }
-
-            _ = TryValue();
         }
 
-        if (!hadDuplicate && reader.Complete(foundKeys, rejectedKeys, ref value)) {
+        return !hadDuplicate && reader.Complete(foundKeys, rejectedKeys, ref state);
+    }
+
+    public struct ObjectEnumerator : IEnumerator<JsonMember>, IEnumerable<JsonMember>
+    {
+        private readonly ReadOnlyMemory<byte> _text;
+        private TokenSlice _s;
+        private JsonMember? _current;
+
+        internal ObjectEnumerator(ReadOnlyMemory<byte> text, TokenSlice s)
+        {
+            _text = text;
+            _s = s;
+            _current = null;
+        }
+
+        [PublicAPI]
+        public bool MoveNext()
+        {
+            if (_s.Has(TokenKind.ObjectClose)) {
+                _current = null;
+                return false;
+            }
+
+            if (!_s.Has(TokenKind.StringSimple) && !_s.Has(TokenKind.StringComplexStart)) {
+                _current = null;
+                throw new InvalidOperationException();
+            }
+
+            (var keyToken, _s) = _s.SkipValue();
+            (var valueToken, _s) = _s.SkipValue();
+
+            var key = new JsonValue(_text, keyToken).TryString();
+            Debug.Assert(key is not null);
+            var value = new JsonValue(_text, valueToken);
+
+            _current = new JsonMember(key, value);
             return true;
         }
-        else {
-            _s = save;
-            return false;
+
+        [PublicAPI]
+        public JsonMember Current => _current ?? throw new InvalidOperationException();
+
+        [PublicAPI]
+        public ObjectEnumerator GetEnumerator() => new(_text, _s);
+
+        object IEnumerator.Current => Current;
+
+        void IEnumerator.Reset()
+        {
+            throw new NotSupportedException();
         }
+
+        void IDisposable.Dispose() {}
+
+        IEnumerator<JsonMember> IEnumerable<JsonMember>.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     [PublicAPI]
-    public JsonValue TryValue()
-    {
-        // ReSharper disable once SwitchStatementHandlesSomeKnownEnumValuesWithDefault
-        switch (_s.First?.Kind) {
-            case TokenKind.Null:
-            case TokenKind.BoolTrue:
-            case TokenKind.BoolFalse:
-            case TokenKind.Number:
-            case TokenKind.StringSimple: {
-                (var slice, _s) = _s.SplitAt(1);
-                return WithSlice(slice);
-            }
-
-            case TokenKind.StringComplexStart: {
-                (var slice, _s) = _s.FindSplit(TokenKind.StringComplexEnd);
-                return WithSlice(slice);
-            }
-
-            case TokenKind.ArrayOpen: {
-                (var slice, _s) = _s.FindSplitBalanced(TokenKind.ArrayClose);
-                return WithSlice(slice);
-            }
-
-            case TokenKind.ObjectOpen: {
-                (var slice, _s) = _s.FindSplitBalanced(TokenKind.ObjectClose);
-                return WithSlice(slice);
-            }
-
-            default: {
-                throw new InvalidOperationException("JsonValue is empty");
-            }
-        }
-    }
-
-    [PublicAPI]
-    public JsonValue? TryStructuralValue()
-    {
-        // ReSharper disable once SwitchStatementHandlesSomeKnownEnumValuesWithDefault
-        switch (_s.First?.Kind) {
-            case TokenKind.ArrayOpen: {
-                (var slice, _s) = _s.FindSplitBalanced(TokenKind.ArrayClose);
-                return WithSlice(slice);
-            }
-
-            case TokenKind.ObjectOpen: {
-                (var slice, _s) = _s.FindSplitBalanced(TokenKind.ObjectClose);
-                return WithSlice(slice);
-            }
-
-            default: {
-                return null;
-            }
-        }
-    }
-
-    private JsonValue WithSlice(in TokenSlice slice) => new(_text, slice);
-
-    private ReadOnlySpan<byte> TokenText(Token token) =>
-        _text.Span.Slice(token.Offset, token.Length);
-
-    private string TokenTextAsString(Token token) => Utf8.GetString(TokenText(token));
+    public JsonValue? TryStructuralValue() =>
+        _s.First?.Kind switch {
+            TokenKind.ArrayOpen or TokenKind.ObjectOpen => this,
+            _ => null,
+        };
 }
