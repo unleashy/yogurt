@@ -569,8 +569,8 @@ internal ref struct Parser
 
     private static (int, int) GetLineAndColumn(ReadOnlySpan<byte> start, ReadOnlySpan<byte> end)
     {
-        var line = 0;
-        var column = 0;
+        var line = 1;
+        var column = 1;
 
         var offset = start.Length - end.Length;
         for (var i = 1; i <= offset; ++i) {
@@ -578,7 +578,7 @@ internal ref struct Parser
 
             if (start[i - 1] == '\n') {
                 ++line;
-                column = 0;
+                column = 1;
             }
         }
 

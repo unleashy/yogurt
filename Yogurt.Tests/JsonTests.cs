@@ -16,7 +16,7 @@ public class JsonTests
             sut,
             Throws
                 .TypeOf<JsonParseException>().And
-                .Message.EqualTo("Unexpected end of input: no JSON value found")
+                .Message.EqualTo("Unexpected end of input: no JSON value found (1:1)")
         );
     }
 
@@ -60,50 +60,50 @@ public class JsonTests
         """
         "
         """,
-        "Unterminated string"
+        "Unterminated string (1:1)"
     )]
     [TestCase(
         """
         "bad\escape"
         """,
-        @"Invalid escape sequence '\e' in string"
+        @"Invalid escape sequence '\e' in string (1:6)"
     )]
     [TestCase(
         """
         "\
         """,
-        "Unexpected end of input while parsing escape sequence"
+        "Unexpected end of input while parsing escape sequence (1:3)"
     )]
     [TestCase(
         """
         "\u123"
         """,
-        "Invalid Unicode escape sequence: expected 4 hexadecimal digits; found 3"
+        "Invalid Unicode escape sequence: expected 4 hexadecimal digits; found 3 (1:7)"
     )]
     [TestCase(
         """
         "\u12G4"
         """,
-        "Invalid Unicode escape sequence: expected 4 hexadecimal digits; found 2"
+        "Invalid Unicode escape sequence: expected 4 hexadecimal digits; found 2 (1:6)"
     )]
-    [TestCase("\"\u001F\"", @"Unescaped control character '\x1F' in string")]
+    [TestCase("\"\u001F\"", @"Unescaped control character '\x1F' in string (1:2)")]
     [TestCase(
         """
         "\uD800"
         """,
-        @"Invalid Unicode escape sequence: expected high surrogate '\uD800' to be paired with a low surrogate"
+        @"Invalid Unicode escape sequence: expected high surrogate '\uD800' to be paired with a low surrogate (1:8)"
     )]
     [TestCase(
         """
         "\uDC00"
         """,
-        @"Invalid Unicode escape sequence: unexpected low surrogate '\uDC00' not following a high surrogate"
+        @"Invalid Unicode escape sequence: unexpected low surrogate '\uDC00' not following a high surrogate (1:8)"
     )]
     [TestCase(
         """
         "\uD800\u0041"
         """,
-        @"Invalid Unicode escape sequence: expected high surrogate '\uD800' to be followed by a low surrogate; found '\u0041'"
+        @"Invalid Unicode escape sequence: expected high surrogate '\uD800' to be followed by a low surrogate; found '\u0041' (1:14)"
     )]
     public void StringsInvalid(string raw, string message)
     {
@@ -139,15 +139,15 @@ public class JsonTests
         Assert.That(result, Is.EqualTo(input));
     }
 
-    [TestCase("01", "Invalid number: leading zero is not allowed")]
-    [TestCase("-01", "Invalid number: leading zero is not allowed")]
-    [TestCase("-", "Invalid number: expected digit after negative sign '-'")]
-    [TestCase("1.", "Invalid number: expected digit after decimal point '.'")]
-    [TestCase(".1", "Invalid number: leading decimal point is not allowed")]
-    [TestCase("1e", "Invalid number: expected digit after exponent")]
-    [TestCase("1E", "Invalid number: expected digit after exponent")]
-    [TestCase("1e+", "Invalid number: expected digit after exponent")]
-    [TestCase("1e-", "Invalid number: expected digit after exponent")]
+    [TestCase("01", "Invalid number: leading zero is not allowed (1:2)")]
+    [TestCase("-01", "Invalid number: leading zero is not allowed (1:3)")]
+    [TestCase("-", "Invalid number: expected digit after negative sign '-' (1:2)")]
+    [TestCase("1.", "Invalid number: expected digit after decimal point '.' (1:3)")]
+    [TestCase(".1", "Invalid number: leading decimal point is not allowed (1:2)")]
+    [TestCase("1e", "Invalid number: expected digit after exponent (1:3)")]
+    [TestCase("1E", "Invalid number: expected digit after exponent (1:3)")]
+    [TestCase("1e+", "Invalid number: expected digit after exponent (1:4)")]
+    [TestCase("1e-", "Invalid number: expected digit after exponent (1:4)")]
     public void NumbersInvalid(string input, string message)
     {
         var sut = () => JsonValue.Parse(input);
@@ -254,10 +254,10 @@ public class JsonTests
         Assert.That(result, Is.EqualTo(values));
     }
 
-    [TestCase("[", "Unexpected end of input: unclosed array")]
-    [TestCase("[,1]", "Unexpected character ','")]
-    [TestCase("[1, 2,]", "Trailing comma is not allowed")]
-    [TestCase("[1 2]", "Expected ',' or ']' after value in array; found '2'")]
+    [TestCase("[", "Unexpected end of input: unclosed array (1:2)")]
+    [TestCase("[,1]", "Unexpected character ',' (1:2)")]
+    [TestCase("[1, 2,]", "Trailing comma is not allowed (1:7)")]
+    [TestCase("[1 2]", "Expected ',' or ']' after value in array; found '2' (1:4)")]
     public void ArraysInvalid(string input, string message)
     {
         var sut = () => JsonValue.Parse(input);
@@ -291,15 +291,15 @@ public class JsonTests
         Assert.That(result, Is.EqualTo(entries));
     }
 
-    [TestCase("{", "Unexpected end of input: unclosed object")]
-    [TestCase("""{"" """, "Unexpected end of input: unclosed object")]
-    [TestCase("""{"":1""", "Unexpected end of input: unclosed object")]
-    [TestCase("""{"":1,""", "Unexpected end of input: unclosed object")]
-    [TestCase("""{,"":1}""", "Unexpected character ','")]
-    [TestCase("""{"":1,}""", "Trailing comma is not allowed")]
-    [TestCase("""{"":1 "":2}""", "Expected ',' or '}' after value in object; found '\"'")]
-    [TestCase("{1:2}", "Object keys must be strings; found '1'")]
-    [TestCase("""{"" 1}""", "Expected ':' after object key; found '1'")]
+    [TestCase("{", "Unexpected end of input: unclosed object (1:2)")]
+    [TestCase("""{"" """, "Unexpected end of input: unclosed object (1:5)")]
+    [TestCase("""{"":1""", "Unexpected end of input: unclosed object (1:6)")]
+    [TestCase("""{"":1,""", "Unexpected end of input: unclosed object (1:7)")]
+    [TestCase("""{,"":1}""", "Unexpected character ',' (1:2)")]
+    [TestCase("""{"":1,}""", "Trailing comma is not allowed (1:7)")]
+    [TestCase("""{"":1 "":2}""", "Expected ',' or '}' after value in object; found '\"' (1:7)")]
+    [TestCase("{1:2}", "Object keys must be strings; found '1' (1:2)")]
+    [TestCase("""{"" 1}""", "Expected ':' after object key; found '1' (1:5)")]
     public void ObjectsInvalid(string input, string message)
     {
         var sut = () => JsonValue.Parse(input);
@@ -356,9 +356,9 @@ public class JsonTests
         Assert.That(result, Is.EqualTo((Foo: 123, Bar: "of gold", Bux: (int?)null)));
     }
 
-    [TestCase("1 2", "Unexpected trailing content after JSON value: '2'")]
-    [TestCase("[][]", "Unexpected trailing content after JSON value: '[]'")]
-    [TestCase("{}{}", "Unexpected trailing content after JSON value: '{}'")]
+    [TestCase("1 2", "Unexpected trailing content after JSON value: '2' (1:3)")]
+    [TestCase("[][]", "Unexpected trailing content after JSON value: '[]' (1:3)")]
+    [TestCase("{}{}", "Unexpected trailing content after JSON value: '{}' (1:3)")]
     public void TrailingData(string input, string message)
     {
         var sut = () => JsonValue.Parse(input);
@@ -370,16 +370,16 @@ public class JsonTests
         );
     }
 
-    [TestCase("", 0, 0)]
-    [TestCase("{", 0, 1)]
-    [TestCase("{,}", 0, 1)]
-    [TestCase("{\n  \"a\": 1,\n}", 2, 0)]
-    [TestCase("{\r\n  \"a\": 1,\r\n}", 2, 0)]
-    [TestCase("\n\n\n{bad}", 3, 1)]
-    [TestCase("""{"a": "unterminated}""", 0, 6)]
-    [TestCase("\"first line\nsecond line\"", 0, 11)]
-    [TestCase("\"a\\qb\"", 0, 3)]
-    [TestCase("\n[\"🩻\", Utf8]", 1, 9)]
+    [TestCase("", 1, 1)]
+    [TestCase("{", 1, 2)]
+    [TestCase("{,}", 1, 2)]
+    [TestCase("{\n  \"a\": 1,\n}", 3, 1)]
+    [TestCase("{\r\n  \"a\": 1,\r\n}", 3, 1)]
+    [TestCase("\n\n\n{bad}", 4, 2)]
+    [TestCase("""{"a": "unterminated}""", 1, 7)]
+    [TestCase("\"first line\nsecond line\"", 1, 12)]
+    [TestCase("\"a\\qb\"", 1, 4)]
+    [TestCase("\n[\"🩻\", Utf8]", 2, 10)]
     public void LineColumnTracking(string input, int line, int column)
     {
         Action sut = () => JsonValue.Parse(input);
