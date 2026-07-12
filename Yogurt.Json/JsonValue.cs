@@ -351,7 +351,7 @@ public readonly struct JsonValue
 
     [PublicAPI]
     public JsonValue? TryStructuralValue() =>
-        _s.First?.Kind switch {
+        _s.First.Kind switch {
             TokenKind.ArrayOpen or TokenKind.ObjectOpen => this,
             _ => null,
         };

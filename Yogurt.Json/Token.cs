@@ -23,16 +23,31 @@ internal readonly record struct Token(TokenKind Kind, int Offset, int Length)
     public ReadOnlySpan<byte> Text(ReadOnlyMemory<byte> text) => text.Span.Slice(Offset, Length);
 }
 
-internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
+internal readonly struct TokenSlice
 {
-    public Token? First => IsEmpty ? null : Tokens.Span[0];
+    private readonly ReadOnlyMemory<Token> _tokens;
 
-    public bool Has(TokenKind kind) => First?.Kind == kind;
+    public TokenSlice(ReadOnlyMemory<Token> tokens)
+    {
+        if (tokens.Length == 0) {
+            throw new ArgumentOutOfRangeException(
+                paramName: nameof(tokens),
+                message: "Cannot create an empty TokenSlice",
+                actualValue: tokens.Length
+            );
+        }
+
+        _tokens = tokens;
+    }
+
+    public Token First => _tokens.Span[0];
+
+    public bool Has(TokenKind kind) => First.Kind == kind;
 
     public Token? Match(TokenKind kind) =>
         First is {} token && token.Kind == kind ? token : null;
 
-    public TokenSlice Skip() => IsEmpty ? this : Slice(1);
+    public TokenSlice Skip() => Slice(1);
 
     public TokenSlice SkipIf(TokenKind kind, out bool didSkip)
     {
@@ -44,7 +59,7 @@ internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
 
     public (TokenSlice, TokenSlice) FindSplit(TokenKind needle)
     {
-        var span = Tokens.Span;
+        var span = _tokens.Span;
         var i = 0;
         while (i < span.Length) {
             if (span[i++].Kind == needle) {
@@ -57,7 +72,7 @@ internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
 
     public Token FindSplit(TokenKind end, out ReadOnlyMemory<Token> result)
     {
-        var span = Tokens.Span;
+        var span = _tokens.Span;
         var i = 0;
         while (i < span.Length) {
             if (span[i].Kind == end) {
@@ -67,13 +82,13 @@ internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
             ++i;
         }
 
-        result = Tokens[.. i];
+        result = _tokens[.. i];
         return span[i];
     }
 
     public (TokenSlice Before, TokenSlice After) FindSplitBalanced(TokenKind close)
     {
-        var span = Tokens.Span;
+        var span = _tokens.Span;
         if (span.Length == 0) throw new InvalidOperationException("Empty token slice");
 
         var open = span[0].Kind;
@@ -97,7 +112,7 @@ internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
     }
 
     public (TokenSlice Before, TokenSlice After) SkipValue() =>
-        First?.Kind switch {
+        First.Kind switch {
             TokenKind.Null or
             TokenKind.BoolTrue or
             TokenKind.BoolFalse or
@@ -112,9 +127,16 @@ internal readonly record struct TokenSlice(ReadOnlyMemory<Token> Tokens)
             _ => throw new InvalidOperationException("TokenSlice is empty"),
         };
 
-    private bool IsEmpty => Tokens.Length == 0;
+    private TokenSlice Slice(int start) => Slice(start, _tokens.Length);
 
-    private TokenSlice Slice(int start) => new(Tokens[start ..]);
-
-    private TokenSlice Slice(int start, int end) => new(Tokens[start .. end]);
+    private TokenSlice Slice(int start, int end)
+    {
+        var newTokens = _tokens[start .. end];
+        return newTokens.Length > 0
+            ? new TokenSlice(newTokens)
+            : throw new ArgumentException(
+                  $"Given range ({start} .. {end}) would create an empty TokenSlice " +
+                  $"(current length: {_tokens.Length})"
+              );
+    }
 }
