@@ -1,4 +1,6 @@
-﻿using System.Collections;
+﻿global using JsonMember = System.Collections.Generic.KeyValuePair<string, Yogurt.Json.JsonValue>;
+using System.Collections;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
@@ -6,7 +8,6 @@ using System.Text;
 
 namespace Yogurt.Json;
 
-using JsonMember = KeyValuePair<string, JsonValue>;
 
 public readonly struct JsonValue
 {
@@ -376,13 +377,14 @@ public readonly struct JsonValue
     {
         if (TryObject() is not {} e) return false;
 
+        var hadDuplicate = false;
         var foundKeys = new HashSet<string>();
         var rejectedKeys = new HashSet<string>();
-        var hadDuplicate = false;
+        var keys = new JsonObjectReaderKeys(foundKeys, rejectedKeys);
 
         foreach (var (key, value) in e) {
             if (foundKeys.Add(key)) {
-                if (!reader.TryRead(key, value, ref state)) {
+                if (!reader.TryRead(key, value, keys, ref state)) {
                     _ = rejectedKeys.Add(key);
                 }
             }
@@ -391,7 +393,7 @@ public readonly struct JsonValue
             }
         }
 
-        return !hadDuplicate && reader.Complete(this, foundKeys, rejectedKeys, ref state);
+        return !hadDuplicate && reader.Complete(this, keys, ref state);
     }
 
     private ref T Object<T>(IJsonObjectReader<T> reader, ref T state)
@@ -399,10 +401,11 @@ public readonly struct JsonValue
         if (TryObject() is not {} e) throw KindError(TokenKind.ObjectOpen);
 
         var foundKeys = new HashSet<string>();
+        var keys = new JsonObjectReaderKeys(foundKeys, ImmutableHashSet<string>.Empty);
 
         foreach (var (key, value) in e) {
             if (foundKeys.Add(key)) {
-                if (!reader.TryRead(key, value, ref state)) {
+                if (!reader.TryRead(key, value, keys, ref state)) {
                     throw Error(value, $"Could not read value for key {key.JsonEscape()}");
                 }
             }
@@ -411,7 +414,7 @@ public readonly struct JsonValue
             }
         }
 
-        if (!reader.Complete(this, foundKeys, new HashSet<string>(), ref state)) {
+        if (!reader.Complete(this, keys, ref state)) {
             throw Error("Could not complete read of object");
         }
 

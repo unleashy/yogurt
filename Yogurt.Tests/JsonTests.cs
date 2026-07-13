@@ -347,6 +347,41 @@ public class JsonTests
         Assert.That(result, Is.EqualTo((Foo: 123, Bar: "of gold", Bux: (int?)null)));
     }
 
+    [Test]
+    public void ShapeReaderOneOf()
+    {
+        var sut = JsonValue.Parse("""{ "a": 1, "b": 2 }""");
+        var shape = new JsonObjectShape<int>()
+            .Require("a", (in json, x) => x + json.Number<int>())
+            .RequireOneOf(
+                "b", (in json, x) => x * json.Number<int>(),
+                "c", (in _, _) => -99
+            );
+
+        var result = sut.TryObject(42, shape);
+
+        Assert.That(result, Is.EqualTo((1 + 42) * 2));
+    }
+
+    [Test]
+    public void ShapeReaderOneOfConflict()
+    {
+        var sut = JsonValue.Parse("""{ "a": 1, "b": 2, "c": 2 }""");
+        var shape = new JsonObjectShape<int>()
+            .Require("a", (in json, x) => x + json.Number<int>())
+            .RequireOneOf(
+                "b", (in json, x) => x * json.Number<int>(),
+                "c", (in _, _) => -99
+            );
+
+        var result = () => sut.Object(42, shape);
+
+        Assert.That(result,
+            Throws
+                .TypeOf<JsonValueException>().And
+                .Message.EqualTo("$.c: Invalid key \"c\" as it conflicts with \"b\" (at 1:24)"));
+    }
+
     [TestCase("1 2", "Unexpected trailing content after JSON value: '2' (1:3)")]
     [TestCase("[][]", "Unexpected trailing content after JSON value: '[]' (1:3)")]
     [TestCase("{}{}", "Unexpected trailing content after JSON value: '{}' (1:3)")]
@@ -416,7 +451,12 @@ internal sealed class FakeJsonObjectReader : IJsonObjectReader<Dictionary<string
     public IReadOnlySet<string> ReceivedFoundKeys { get; private set; } = new HashSet<string>();
     public IReadOnlySet<string> ReceivedRejectedKeys { get; set; } = new HashSet<string>();
 
-    public bool TryRead(string key, in JsonValue value, scoped ref Dictionary<string, int> state)
+    public bool TryRead(
+        string key,
+        in JsonValue value,
+        JsonObjectReaderKeys keys,
+        scoped ref Dictionary<string, int> state
+    )
     {
         _ = ActualKeysFound.Add(key);
 
@@ -431,13 +471,12 @@ internal sealed class FakeJsonObjectReader : IJsonObjectReader<Dictionary<string
 
     public bool Complete(
         in JsonValue objectValue,
-        IReadOnlySet<string> foundKeys,
-        IReadOnlySet<string> rejectedKeys,
+        JsonObjectReaderKeys keys,
         scoped ref Dictionary<string, int> state
     )
     {
-        ReceivedFoundKeys = foundKeys;
-        ReceivedRejectedKeys = rejectedKeys;
+        ReceivedFoundKeys = keys.Found;
+        ReceivedRejectedKeys = keys.Rejected;
         return true;
     }
 }
