@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="Yogurt.Json/Yogurt.Json.csproj" />
+  <Project Path="Yogurt.JsonRpc/Yogurt.JsonRpc.csproj" />
   <Project Path="Yogurt.Server/Yogurt.Server.csproj" />
   <Project Path="Yogurt.Tests/Yogurt.Tests.csproj" />
 </Solution>

@@ -1,8 +1,6 @@
-﻿using Yogurt.Json;
+﻿namespace Yogurt.JsonRpc;
 
-namespace Yogurt.Server;
-
-public readonly struct JsonRpcId : IEquatable<JsonRpcId>
+public readonly struct JsonRpcId : IEquatable<JsonRpcId>, IJsonable<JsonRpcId>
 {
     private enum Repr
     {
@@ -45,6 +43,17 @@ public readonly struct JsonRpcId : IEquatable<JsonRpcId>
               json,
               $"Expected a number parseable as Int, string, or null; got {json.HumanTypeName()}"
           );
+
+    [PublicAPI]
+    public void ToJson(JsonWriter json)
+    {
+        switch (_repr) {
+            case Repr.Null:    json.Null(); break;
+            case Repr.Integer: json.Number(_ival); break;
+            case Repr.String:  json.String(_sval!); break;
+            default: throw new System.Diagnostics.UnreachableException();
+        }
+    }
 
     [PublicAPI]
     public bool Equals(JsonRpcId other) => (_repr, other._repr) switch {

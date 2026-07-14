@@ -1,5 +1,5 @@
 ﻿using Yogurt.Json;
-using Yogurt.Server;
+using Yogurt.JsonRpc;
 
 namespace Yogurt.Tests;
 
