@@ -484,7 +484,7 @@ internal ref struct Parser
         Error($"Unexpected character '{c}'");
 
     private JsonParseException ErrorTrailingData() =>
-        Error($"Unexpected trailing content after JSON value: '{Encoding.UTF8.GetString(_s)}'");
+        Error($"Unexpected trailing content after JSON value: '{Utf8.GetString(_s)}'");
 
     private JsonParseException ErrorTooDeep() =>
         Error($"Maximum nesting depth of {JsonValue.MaxDepth} exceeded");

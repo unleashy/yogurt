@@ -8,11 +8,6 @@ public ref struct JsonPath
 {
     private readonly record struct Part(int? Index = null, string? Property = null);
 
-    private static readonly UTF8Encoding Utf8 = new(
-        encoderShouldEmitUTF8Identifier: false,
-        throwOnInvalidBytes: true
-    );
-
     private const byte Quote = (byte)'\"';
     private const byte Escape = (byte)'\\';
     private const byte Comma = (byte)',';

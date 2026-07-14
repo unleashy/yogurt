@@ -79,6 +79,7 @@ internal readonly struct TokenSlice
     }
 
     public Token First => _tokens.Span[0];
+    public Token Last => _tokens.Span[^1];
 
     public bool Has(TokenKind kind) => First.Kind == kind;
 

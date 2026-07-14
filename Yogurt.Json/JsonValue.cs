@@ -8,15 +8,9 @@ using System.Text;
 
 namespace Yogurt.Json;
 
-
 public readonly struct JsonValue
 {
     internal const int MaxDepth = 64;
-
-    private static readonly UTF8Encoding Utf8 = new(
-        encoderShouldEmitUTF8Identifier: false,
-        throwOnInvalidBytes: true
-    );
 
     private readonly ReadOnlyMemory<byte> _text;
     private readonly TokenSlice _s;
@@ -503,6 +497,15 @@ public readonly struct JsonValue
 
     [PublicAPI]
     public string HumanTypeName() => _s.First.Kind.HumanName();
+
+    [PublicAPI]
+    public void ToJson(JsonWriter json)
+    {
+        var first = _s.First;
+        var last = _s.Last;
+
+        json.WriteRaw(_text.Span[first.Offset .. (last.Offset + last.Length)]);
+    }
 
     private JsonValueException KindError(TokenKind expected) =>
         KindError(expected.HumanName(), _s.First.Kind.HumanName());
