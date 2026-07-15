@@ -6,9 +6,9 @@ namespace Yogurt.Tests;
 
 public class ProtocolReaderTests
 {
-    private static readonly ProtocolMessageTestEqualityComparer Eq = new();
+    private static readonly MessageTestEqualityComparer Eq = new();
 
-    private static ProtocolMessage Message(string s) => new(Encoding.UTF8.GetBytes(s));
+    private static ReadOnlyMemory<byte> Message(string s) => Encoding.UTF8.GetBytes(s);
 
     [Test]
     public async Task Empty()
@@ -288,13 +288,13 @@ internal sealed class ChunkyStream(byte[][] chunks) : Stream
     }
 }
 
-internal sealed class ProtocolMessageTestEqualityComparer : IEqualityComparer<ProtocolMessage>
+internal sealed class MessageTestEqualityComparer : IEqualityComparer<ReadOnlyMemory<byte>>
 {
-    public bool Equals(ProtocolMessage x, ProtocolMessage y) =>
-        x.Utf8Text.Span.SequenceEqual(y.Utf8Text.Span);
+    public bool Equals(ReadOnlyMemory<byte> x, ReadOnlyMemory<byte> y) =>
+        x.Span.SequenceEqual(y.Span);
 
-    public int GetHashCode(ProtocolMessage obj)
+    public int GetHashCode(ReadOnlyMemory<byte> obj)
     {
-        return obj.Utf8Text.Span.GetHashCode();
+        return obj.Span.GetHashCode();
     }
 }

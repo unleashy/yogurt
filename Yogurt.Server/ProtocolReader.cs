@@ -7,9 +7,9 @@ using System.Text.Unicode;
 
 namespace Yogurt.Server;
 
-public sealed class ProtocolReader(PipeReader reader) : IProtocolReader
+public sealed class ProtocolReader(PipeReader reader)
 {
-    public async IAsyncEnumerable<ProtocolMessage> ReadAllAsync(
+    public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReadAllAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )
     {
@@ -26,7 +26,7 @@ public sealed class ProtocolReader(PipeReader reader) : IProtocolReader
         }
     }
 
-    private async ValueTask<ProtocolMessage?> ReadContent(
+    private async ValueTask<ReadOnlyMemory<byte>?> ReadContent(
         int contentLength,
         CancellationToken cancellationToken = default
     )
@@ -47,7 +47,7 @@ public sealed class ProtocolReader(PipeReader reader) : IProtocolReader
 
             var text = buffer.Slice(0, contentLength).ToArray();
             return Utf8.IsValid(text)
-                ? new ProtocolMessage(text)
+                ? text
                 : throw new InvalidDataException("Invalid content: malformed UTF-8");
         }
         finally {

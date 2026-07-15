@@ -3,10 +3,10 @@ using System.IO.Pipelines;
 
 namespace Yogurt.Server;
 
-public sealed class ProtocolWriter(PipeWriter writer) : IProtocolWriter
+public sealed class ProtocolWriter(PipeWriter writer)
 {
     public async ValueTask WriteAsync(
-        ProtocolMessage message,
+        ReadOnlyMemory<byte> message,
         CancellationToken cancellationToken = default
     )
     {
@@ -14,7 +14,7 @@ public sealed class ProtocolWriter(PipeWriter writer) : IProtocolWriter
 
         var header = "Content-Length: "u8;
         var separator = "\r\n\r\n"u8;
-        var messageLength = message.Utf8Text.Length;
+        var messageLength = message.Length;
         var numDigits = (int)(1 + float.Max(0, float.Log10(messageLength)));
         var headersLength = header.Length + numDigits + separator.Length;
 
@@ -27,6 +27,6 @@ public sealed class ProtocolWriter(PipeWriter writer) : IProtocolWriter
 
         writer.Advance(headersLength);
 
-        _ = await writer.WriteAsync(message.Utf8Text, cancellationToken);
+        _ = await writer.WriteAsync(message, cancellationToken);
     }
 }

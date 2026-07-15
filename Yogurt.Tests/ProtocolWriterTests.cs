@@ -6,7 +6,7 @@ namespace Yogurt.Tests;
 
 public class ProtocolWriterTests
 {
-    private static ProtocolMessage Message(string s) => new(Encoding.UTF8.GetBytes(s));
+    private static ReadOnlyMemory<byte> Message(string s) => Encoding.UTF8.GetBytes(s);
 
     private static async ValueTask<string> ReadAllAsync(PipeReader reader)
     {
