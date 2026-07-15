@@ -1,6 +1,7 @@
 ﻿namespace Yogurt.Json;
 
 public interface IJsonObjectReader<T>
+    where T : allows ref struct
 {
     [PublicAPI]
     bool TryRead(

@@ -9,7 +9,7 @@ namespace Yogurt.Json;
 
 using JsonMember = KeyValuePair<string, JsonValue>;
 
-public readonly struct JsonValue
+public readonly struct JsonValue : IJsonable<JsonValue>
 {
     internal const int MaxDepth = 64;
 
@@ -21,6 +21,9 @@ public readonly struct JsonValue
 
     [PublicAPI]
     public static JsonValue Parse(ReadOnlyMemory<byte> text) => new(text, Parser.Parse(text));
+
+    [PublicAPI]
+    public static JsonValue Parse(in JsonValue json) => json;
 
     private JsonValue(ReadOnlyMemory<byte> text, TokenSlice s)
     {
@@ -362,6 +365,7 @@ public readonly struct JsonValue
 
     [PublicAPI]
     public T Object<T>(T basis, IJsonObjectReader<T> reader)
+        where T : allows ref struct
     {
         return Object(reader, ref basis);
     }
@@ -369,6 +373,7 @@ public readonly struct JsonValue
     /// Private implementation of TryObject that correctly handles both struct and class types'
     /// nullability in all cases by using a ref parameter instead of a T? return
     private bool TryObject<T>(IJsonObjectReader<T> reader, scoped ref T state)
+        where T : allows ref struct
     {
         if (TryObject() is not {} e) return false;
 
@@ -392,6 +397,7 @@ public readonly struct JsonValue
     }
 
     private ref T Object<T>(IJsonObjectReader<T> reader, ref T state)
+        where T : allows ref struct
     {
         if (TryObject() is not {} e) throw KindError(TokenKind.ObjectOpen);
 
