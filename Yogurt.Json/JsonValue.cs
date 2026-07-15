@@ -1,5 +1,4 @@
-﻿global using JsonMember = System.Collections.Generic.KeyValuePair<string, Yogurt.Json.JsonValue>;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -7,6 +6,8 @@ using System.Numerics;
 using System.Text;
 
 namespace Yogurt.Json;
+
+using JsonMember = KeyValuePair<string, JsonValue>;
 
 public readonly struct JsonValue
 {
