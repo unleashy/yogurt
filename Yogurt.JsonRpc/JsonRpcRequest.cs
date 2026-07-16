@@ -1,15 +1,26 @@
 ﻿namespace Yogurt.JsonRpc;
 
-[method: PublicAPI]
-public readonly record struct JsonRpcRequest(
-    [property: PublicAPI] JsonRpcId? Id,
-    [property: PublicAPI] string Method,
-    [property: PublicAPI] JsonValue? Params
-) : IJsonable<JsonRpcRequest>
+public readonly record struct JsonRpcRequest : IJsonable<JsonRpcRequest>
 {
+    [PublicAPI] public required string Method { get; init; } = "";
+    [PublicAPI] public JsonRpcId? Id { get; init; } = null;
+    [PublicAPI] public JsonValue? Params {
+        get;
+        init {
+            if (value is {} it && it.TryStructuralValue() is null) {
+                throw new ArgumentException("Params must be an array or object", nameof(value));
+            }
+
+            field = value;
+        }
+    } = null;
+
+    public JsonRpcRequest()
+    {}
+
     [PublicAPI]
     public static JsonRpcRequest Parse(in JsonValue json) =>
-        json.Object(new JsonRpcRequest(), Shape);
+        json.Object(default, Shape);
 
     [PublicAPI]
     public void ToJson(JsonWriter json)

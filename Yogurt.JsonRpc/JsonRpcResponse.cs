@@ -1,38 +1,44 @@
-﻿namespace Yogurt.JsonRpc;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace Yogurt.JsonRpc;
 
 public readonly record struct JsonRpcResponse : IJsonable<JsonRpcResponse>
 {
-    [PublicAPI] public JsonRpcId Id { get; init; }
-    [PublicAPI] public JsonValue? Result { get; }
-    [PublicAPI] public JsonRpcError? Error { get; }
+    private readonly bool _isResult = false;
+    private readonly JsonValue _result = default;
+    private readonly JsonRpcError _error = new();
+
+    [PublicAPI] public required JsonRpcId Id { get; init; } = JsonRpcId.Null;
+    [PublicAPI] public JsonValue? Result => _isResult ? _result : null;
+    [PublicAPI] public JsonRpcError? Error => _isResult ? null : _error;
 
     [PublicAPI]
-    public static JsonRpcResponse CreateResult(JsonRpcId id, JsonValue result)
-    {
-        return new JsonRpcResponse(id, result);
-    }
+    public static JsonRpcResponse CreateResult(JsonRpcId id, JsonValue result) => new(id, result);
 
     [PublicAPI]
-    public static JsonRpcResponse CreateError(JsonRpcId id, JsonRpcError error)
-    {
-        return new JsonRpcResponse(id, error);
-    }
+    public static JsonRpcResponse CreateError(JsonRpcId id, JsonRpcError error) => new(id, error);
 
+    public JsonRpcResponse()
+    {}
+
+    [SetsRequiredMembers]
     private JsonRpcResponse(JsonRpcId id, JsonValue result)
     {
+        _isResult = true;
+        _result = result;
         Id = id;
-        Result = result;
     }
 
+    [SetsRequiredMembers]
     private JsonRpcResponse(JsonRpcId id, JsonRpcError error)
     {
+        _isResult = false;
+        _error = error;
         Id = id;
-        Error = error;
     }
 
     [PublicAPI]
-    public static JsonRpcResponse Parse(in JsonValue json) =>
-        json.Object(new JsonRpcResponse(), Shape);
+    public static JsonRpcResponse Parse(in JsonValue json) => json.Object(default, Shape);
 
     [PublicAPI]
     public void ToJson(JsonWriter json)

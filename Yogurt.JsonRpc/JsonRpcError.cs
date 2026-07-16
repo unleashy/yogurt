@@ -1,16 +1,19 @@
-﻿namespace Yogurt.JsonRpc;
+﻿using System.Diagnostics.CodeAnalysis;
 
-[method: PublicAPI]
-public readonly record struct JsonRpcError(
-    [property: PublicAPI] int Code,
-    [property: PublicAPI] string Message,
-    [property: PublicAPI] JsonValue? Data
-) :
-    IJsonable<JsonRpcError>
+namespace Yogurt.JsonRpc;
+
+public readonly record struct JsonRpcError : IJsonable<JsonRpcError>
 {
+    [PublicAPI] public required int Code { get; init; } = (int)JsonRpcErrorCodes.Unknown;
+    [PublicAPI] public required string Message { get; init; } = "Unknown error";
+    [PublicAPI] public JsonValue? Data { get; init; } = null;
+
+    [PublicAPI, SetsRequiredMembers]
+    public JsonRpcError()
+    {}
+
     [PublicAPI]
-    public static JsonRpcError Parse(in JsonValue json) =>
-        json.Object(new JsonRpcError(), Shape);
+    public static JsonRpcError Parse(in JsonValue json) => json.Object(Shape);
 
     [PublicAPI]
     public void ToJson(JsonWriter json)
