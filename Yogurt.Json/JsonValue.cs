@@ -363,6 +363,12 @@ public readonly struct JsonValue : IJsonable<JsonValue>
         return basis is {} b && TryObject(reader, ref b) ? b : null;
     }
 
+    public T Object<T>(IJsonObjectReader<T> reader)
+        where T : new(), allows ref struct
+    {
+        return Object(new T(), reader);
+    }
+
     [PublicAPI]
     public T Object<T>(T basis, IJsonObjectReader<T> reader)
         where T : allows ref struct
