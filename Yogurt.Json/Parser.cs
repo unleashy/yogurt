@@ -585,17 +585,3 @@ internal ref struct Parser
         return (line, column);
     }
 }
-
-file static class SpanExtensions
-{
-    public static int IndexOf(this ReadOnlySpan<byte> span, Func<char, bool> predicate)
-    {
-        for (var i = 0; i < span.Length; ++i) {
-            if (predicate((char)span[i])) {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-}

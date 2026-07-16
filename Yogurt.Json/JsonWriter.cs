@@ -1,27 +1,48 @@
 ﻿using System.Buffers;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
-using System.Text.Encodings.Web;
 
 namespace Yogurt.Json;
 
-[method: PublicAPI]
-public sealed class JsonWriter(IBufferWriter<byte> writer)
+public sealed class JsonWriter
 {
+    private ArrayBufferWriter<byte> _buffer = new();
+    private ImmutableArray<Token>.Builder _tokens = ImmutableArray.CreateBuilder<Token>();
     private bool _hadItem;
     private bool _hadMember;
 
     [PublicAPI]
+    public JsonValue DrainToJson()
+    {
+        if (_tokens.Count == 0) {
+            throw new InvalidOperationException("No tokens written");
+        }
+
+        var text = _buffer.WrittenMemory;
+        _buffer = new ArrayBufferWriter<byte>();
+
+        var tokens = _tokens.DrainToImmutable();
+
+        return new JsonValue(text, new TokenSlice(tokens.AsMemory()));
+    }
+
+    [PublicAPI]
     public void Null()
     {
-        writer.Write("null"u8);
+        AddTokenWithText(TokenKind.Null, "null"u8);
     }
 
     [PublicAPI]
     public void Boolean(bool value)
     {
-        writer.Write(value ? "true"u8 : "false"u8);
+        if (value) {
+            AddTokenWithText(TokenKind.BoolTrue, "true"u8);
+        }
+        else {
+            AddTokenWithText(TokenKind.BoolFalse, "false"u8);
+        }
     }
 
     [PublicAPI]
@@ -37,14 +58,16 @@ public sealed class JsonWriter(IBufferWriter<byte> writer)
         }
 
         bool hadSpace;
-        var bytesWritten = 0;
+        var length = 0;
 
         do {
-            var span = writer.GetSpan(2 * bytesWritten);
-            hadSpace = value.TryFormat(span, out bytesWritten, "G", CultureInfo.InvariantCulture);
+            var span = _buffer.GetSpan(2 * length);
+            hadSpace = value.TryFormat(span, out length, "G", CultureInfo.InvariantCulture);
         } while (!hadSpace);
 
-        writer.Advance(bytesWritten);
+        var offset = _buffer.WrittenCount;
+        _buffer.Advance(length);
+        _tokens.Add(new Token(TokenKind.Number, offset, length));
     }
 
     [PublicAPI]
@@ -56,25 +79,102 @@ public sealed class JsonWriter(IBufferWriter<byte> writer)
     [PublicAPI]
     public void String(ReadOnlySpan<byte> value)
     {
-        WriteRaw((byte)'"');
+        var nextIndex = value.IndexOf(NeedsEscaping);
+        if (nextIndex == -1) {
+            StringSimple(value);
+        }
+        else {
+            StringComplex(value, nextIndex);
+        }
+    }
 
-        var encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
-        while (true) {
-            var span = writer.GetSpan();
-            var status = encoder.EncodeUtf8(value, span, out var read, out var written);
-            writer.Advance(written);
+    private void StringSimple(ReadOnlySpan<byte> value)
+    {
+        Debug.Assert(value.IndexOf(NeedsEscaping) == -1);
 
-            if (status == OperationStatus.Done) {
-                break;
+        var offset = _buffer.WrittenCount;
+
+        WriteText((byte)'"');
+        WriteText(value);
+        WriteText((byte)'"');
+
+        AddToken(TokenKind.StringSimple, offset);
+    }
+
+    private void StringComplex(ReadOnlySpan<byte> value, int nextIndex)
+    {
+        Debug.Assert(0 <= nextIndex && nextIndex <= value.Length);
+
+        AddTokenWithText(TokenKind.StringComplexStart, (byte)'"');
+
+        while (nextIndex != -1) {
+            WriteText(value[.. nextIndex]);
+            var offset = _buffer.WrittenCount;
+            WriteText((byte)'\\');
+
+            var ch = value[nextIndex];
+            switch ((char)ch) {
+                case '"':
+                case '\\': {
+                    WriteText(ch);
+                    AddToken(TokenKind.StringEscape, offset);
+                    break;
+                }
+
+                case '\b': {
+                    WriteText((byte)'b');
+                    AddToken(TokenKind.StringEscape, offset);
+                    break;
+                }
+
+                case '\f': {
+                    WriteText((byte)'f');
+                    AddToken(TokenKind.StringEscape, offset);
+                    break;
+                }
+
+                case '\n': {
+                    WriteText((byte)'n');
+                    AddToken(TokenKind.StringEscape, offset);
+                    break;
+                }
+
+                case '\r': {
+                    WriteText((byte)'r');
+                    AddToken(TokenKind.StringEscape, offset);
+                    break;
+                }
+
+                case '\t': {
+                    WriteText((byte)'t');
+                    AddToken(TokenKind.StringEscape, offset);
+                    break;
+                }
+
+                default: {
+                    Debug.Assert(ch <= '\x1F');
+
+                    var span = _buffer.GetSpan(5);
+
+                    span[0] = (byte)'u';
+                    _ = ch.TryFormat(span[1 ..], out _, "X4", CultureInfo.InvariantCulture);
+
+                    _buffer.Advance(5);
+
+                    AddToken(TokenKind.StringEscapeUnicode, offset);
+                    break;
+                }
             }
-            else {
-                Debug.Assert(status == OperationStatus.DestinationTooSmall);
-                value = value[read ..];
-            }
+
+            value = value[(nextIndex + 1) ..];
+            nextIndex = value.IndexOf(NeedsEscaping);
         }
 
-        WriteRaw((byte)'"');
+        WriteText(value);
+        AddTokenWithText(TokenKind.StringComplexEnd, (byte)'"');
     }
+
+    private static bool NeedsEscaping(char c) =>  c is <= '\x1F' or '"' or '\\';
 
     [PublicAPI]
     public void Array(Action<JsonWriter> action)
@@ -82,9 +182,9 @@ public sealed class JsonWriter(IBufferWriter<byte> writer)
         var prevHadItem = _hadItem;
         _hadItem = false;
 
-        WriteRaw((byte)'[');
+        AddTokenWithText(TokenKind.ArrayOpen, (byte)'[');
         action(this);
-        WriteRaw((byte)']');
+        AddTokenWithText(TokenKind.ArrayClose, (byte)']');
 
         _hadItem = prevHadItem;
     }
@@ -93,7 +193,7 @@ public sealed class JsonWriter(IBufferWriter<byte> writer)
     public void Item(Action<JsonWriter> action)
     {
         if (_hadItem) {
-            WriteRaw((byte)',');
+            WriteText((byte)',');
         }
 
         action(this);
@@ -107,9 +207,9 @@ public sealed class JsonWriter(IBufferWriter<byte> writer)
         var prevHadMember = _hadMember;
         _hadMember = false;
 
-        WriteRaw((byte)'{');
+        AddTokenWithText(TokenKind.ObjectOpen, (byte)'{');
         action(this);
-        WriteRaw((byte)'}');
+        AddTokenWithText(TokenKind.ObjectClose, (byte)'}');
 
         _hadMember = prevHadMember;
     }
@@ -118,24 +218,50 @@ public sealed class JsonWriter(IBufferWriter<byte> writer)
     public void Member(string key, Action<JsonWriter> action)
     {
         if (_hadMember) {
-            WriteRaw((byte)',');
+            WriteText((byte)',');
         }
 
         String(key);
-        WriteRaw((byte)':');
+        WriteText((byte)':');
         action(this);
 
         _hadMember = true;
     }
 
-    internal void WriteRaw(ReadOnlySpan<byte> utf8)
+    [PublicAPI]
+    public void Value(in JsonValue value)
     {
-        writer.Write(utf8);
+        _buffer.Write(value.Text.Span);
+        _tokens.AddRange(value.Tokens.Span);
     }
 
-    private void WriteRaw(byte value)
+    private void AddTokenWithText(TokenKind kind, ReadOnlySpan<byte> text)
     {
-        writer.GetSpan(1)[0] = value;
-        writer.Advance(1);
+        var offset = _buffer.WrittenCount;
+        WriteText(text);
+        AddToken(kind, offset);
+    }
+
+    private void AddTokenWithText(TokenKind kind, byte ch)
+    {
+        var offset = _buffer.WrittenCount;
+        WriteText(ch);
+        AddToken(kind, offset);
+    }
+
+    private void AddToken(TokenKind kind, int offset)
+    {
+        _tokens.Add(new Token(kind, offset, _buffer.WrittenCount - offset));
+    }
+
+    private void WriteText(byte value)
+    {
+        _buffer.GetSpan(1)[0] = value;
+        _buffer.Advance(1);
+    }
+
+    private void WriteText(ReadOnlySpan<byte> value)
+    {
+        _buffer.Write(value);
     }
 }

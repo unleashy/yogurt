@@ -31,7 +31,7 @@ public readonly record struct JsonRpcRequest : IJsonable<JsonRpcRequest>
             obj.Member("jsonrpc", it => it.String("2.0"));
             obj.Member("method", it => it.String(self.Method));
             if (self.Id is {} id) obj.Member("id", id.ToJson);
-            if (self.Params is {} p) obj.Member("params", p.ToJson);
+            if (self.Params is {} @params) obj.Member("params", it => it.Value(@params));
         });
     }
 

@@ -65,6 +65,8 @@ internal readonly struct TokenSlice
 {
     private readonly ReadOnlyMemory<Token> _tokens;
 
+    public ReadOnlyMemory<Token> Memory => _tokens;
+
     public TokenSlice(ReadOnlyMemory<Token> tokens)
     {
         if (tokens.Length == 0) {
@@ -79,7 +81,6 @@ internal readonly struct TokenSlice
     }
 
     public Token First => _tokens.Span[0];
-    public Token Last => _tokens.Span[^1];
 
     public bool Has(TokenKind kind) => First.Kind == kind;
 

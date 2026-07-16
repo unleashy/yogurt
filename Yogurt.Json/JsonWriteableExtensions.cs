@@ -1,16 +1,13 @@
-﻿using System.Buffers;
-
-namespace Yogurt.Json;
+﻿namespace Yogurt.Json;
 
 public static class JsonWriteableExtensions
 {
     [PublicAPI]
-    public static ReadOnlyMemory<byte> ToJson<T>(this T self)
+    public static JsonValue ToJson<T>(this T self)
         where T : IJsonWriteable, allows ref struct
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        var writer = new JsonWriter(buffer);
+        var writer = new JsonWriter();
         self.ToJson(writer);
-        return buffer.WrittenMemory;
+        return writer.DrainToJson();
     }
 }

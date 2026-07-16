@@ -9,7 +9,7 @@ namespace Yogurt.Json;
 
 using JsonMember = KeyValuePair<string, JsonValue>;
 
-public readonly struct JsonValue : IJsonable<JsonValue>
+public readonly struct JsonValue
 {
     internal const int MaxDepth = 64;
 
@@ -22,10 +22,7 @@ public readonly struct JsonValue : IJsonable<JsonValue>
     [PublicAPI]
     public static JsonValue Parse(ReadOnlyMemory<byte> text) => new(text, Parser.Parse(text));
 
-    [PublicAPI]
-    public static JsonValue Parse(in JsonValue json) => json;
-
-    private JsonValue(ReadOnlyMemory<byte> text, TokenSlice s)
+    internal JsonValue(ReadOnlyMemory<byte> text, TokenSlice s)
     {
         _text = text;
         _s = s;
@@ -512,13 +509,12 @@ public readonly struct JsonValue : IJsonable<JsonValue>
     public string HumanTypeName() => _s.First.Kind.HumanName();
 
     [PublicAPI]
-    public void ToJson(JsonWriter json)
-    {
-        var first = _s.First;
-        var last = _s.Last;
+    public ReadOnlyMemory<byte> Text => _text;
 
-        json.WriteRaw(_text.Span[first.Offset .. (last.Offset + last.Length)]);
-    }
+    [PublicAPI]
+    public string TextAsString() => Utf8.GetString(_text.Span);
+
+    internal ReadOnlyMemory<Token> Tokens => _s.Memory;
 
     private JsonValueException KindError(TokenKind expected) =>
         KindError(expected.HumanName(), _s.First.Kind.HumanName());

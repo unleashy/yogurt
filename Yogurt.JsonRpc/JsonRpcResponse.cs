@@ -49,7 +49,7 @@ public readonly record struct JsonRpcResponse : IJsonable<JsonRpcResponse>
             obj.Member("jsonrpc", it => it.String("2.0"));
             obj.Member("id", self.Id.ToJson);
 
-            if (self.Result is {} result) obj.Member("result", result.ToJson);
+            if (self.Result is {} result) obj.Member("result", it => it.Value(result));
             else if (self.Error is {} error) obj.Member("error", error.ToJson);
             else throw new System.Diagnostics.UnreachableException();
         });

@@ -1,34 +1,34 @@
-﻿using System.Buffers;
-using System.Diagnostics.CodeAnalysis;
-using System.Text;
+﻿using System.Diagnostics.CodeAnalysis;
 using Yogurt.Json;
 
 namespace Yogurt.Tests;
 
 public class JsonWriterTests
 {
-    private static (JsonWriter, Utf8BufferWriter) Arrange()
-    {
-        var buffer = new Utf8BufferWriter();
-        var sut = new JsonWriter(buffer);
-        return (sut, buffer);
-    }
-
     [Test]
     public void Null()
     {
-        var (sut, buffer) = Arrange();
+        var sut = new JsonWriter();
+
         sut.Null();
-        Assert.That(buffer.WrittenString, Is.EqualTo("null"));
+
+        using (Assert.EnterMultipleScope()) {
+            var json = sut.DrainToJson();
+            Assert.That(json.TryNull(), Is.True);
+            Assert.That(json.TextAsString(), Is.EqualTo("null"));
+        }
     }
 
     [TestCase(true, "true")]
     [TestCase(false, "false")]
     public void Boolean(bool value, string result)
     {
-        var (sut, buffer) = Arrange();
+        var sut = new JsonWriter();
+
         sut.Boolean(value);
-        Assert.That(buffer.WrittenString, Is.EqualTo(result));
+
+        var json = sut.DrainToJson();
+        Assert.That(json.TryBoolean(), Is.EqualTo(value));
     }
 
     [TestCase(0, "0")]
@@ -38,9 +38,15 @@ public class JsonWriterTests
     [TestCase(double.NegativeZero, "-0")]
     public void Number(double value, string result)
     {
-        var (sut, buffer) = Arrange();
+        var sut = new JsonWriter();
+
         sut.Number(value);
-        Assert.That(buffer.WrittenString, Is.EqualTo(result));
+
+        using (Assert.EnterMultipleScope()) {
+            var json = sut.DrainToJson();
+            Assert.That(json.Number<double>(), Is.EqualTo(value));
+            Assert.That(json.TextAsString(), Is.EqualTo(result));
+        }
     }
 
     [TestCase(double.NaN)]
@@ -48,7 +54,7 @@ public class JsonWriterTests
     [TestCase(double.NegativeInfinity)]
     public void NumberInvalid(double value)
     {
-        var (sut, _) = Arrange();
+        var sut = new JsonWriter();
 
         var f = () => sut.Number(value);
 
@@ -66,19 +72,27 @@ public class JsonWriterTests
     [TestCase("foo\\bar", @"""foo\\bar""")]
     [TestCase("<&+/\r\"\n'", @"""<&+/\r\""\n'""")]
     [TestCase("大人になる", @"""大人になる""")]
-    [TestCase("💀😎", @"""\uD83D\uDC80\uD83D\uDE0E""")]
+    [TestCase("💀😎", @"""💀😎""")]
+    [TestCase("\0\x01", @"""\u0000\u0001""")]
     public void String(string value, string result)
     {
-        var (sut, buffer) = Arrange();
+        var sut = new JsonWriter();
+
         sut.String(value);
-        Assert.That(buffer.WrittenString, Is.EqualTo(result));
+
+        using (Assert.EnterMultipleScope()) {
+            var json = sut.DrainToJson();
+            Assert.That(json.String(), Is.EqualTo(value));
+            Assert.That(json.TextAsString(), Is.EqualTo(result));
+        }
     }
 
     [Test]
     [SuppressMessage("ReSharper", "VariableHidesOuterVariable")]
+    [SuppressMessage("Performance", "CA1861:Avoid constant arrays as arguments")]
     public void Array()
     {
-        var (sut, buffer) = Arrange();
+        var sut = new JsonWriter();
 
         sut.Array(it => {
             it.Item(it => it.Number(42));
@@ -89,14 +103,18 @@ public class JsonWriterTests
             it.Item(it => it.Array(_ => {}));
         });
 
-        Assert.That(buffer.WrittenString, Is.EqualTo("""[42,["nested"],true,[]]"""));
+        using (Assert.EnterMultipleScope()) {
+            var json = sut.DrainToJson();
+            Assert.That(json.Array().Count(), Is.EqualTo(4));
+            Assert.That(json.TextAsString(), Is.EqualTo("""[42,["nested"],true,[]]"""));
+        }
     }
 
     [Test]
     [SuppressMessage("ReSharper", "VariableHidesOuterVariable")]
     public void Object()
     {
-        var (sut, buffer) = Arrange();
+        var sut = new JsonWriter();
 
         sut.Object(it => {
             it.Member("foo", it => it.String("bar"));
@@ -107,31 +125,12 @@ public class JsonWriterTests
             it.Member("は", it => it.Object(_ => {}));
         });
 
-        Assert.That(buffer.WrittenString,
-            Is.EqualTo(
-                """{"foo":"bar","data":{"code":-32768,"stuff":[null]},"は":{}}"""
-            )
-        );
+        using (Assert.EnterMultipleScope()) {
+            var json = sut.DrainToJson();
+            Assert.That(json.Object().Count(), Is.EqualTo(3));
+            Assert.That(json.TextAsString(),
+                Is.EqualTo("""{"foo":"bar","data":{"code":-32768,"stuff":[null]},"は":{}}""")
+            );
+        }
     }
-}
-
-internal sealed class Utf8BufferWriter : IBufferWriter<byte>
-{
-    private readonly ArrayBufferWriter<byte> _array = new();
-    private readonly StringBuilder _str = new();
-
-    public string WrittenString => _str.ToString();
-
-    public void Advance(int count)
-    {
-        var prevCount = _array.WrittenCount;
-        _array.Advance(count);
-
-        var utf8 = _array.WrittenSpan[prevCount .. _array.WrittenCount];
-        _ = _str.Append(Encoding.UTF8.GetString(utf8));
-    }
-
-    public Memory<byte> GetMemory(int sizeHint = 0) => _array.GetMemory(sizeHint);
-
-    public Span<byte> GetSpan(int sizeHint = 0) => _array.GetSpan(sizeHint);
 }

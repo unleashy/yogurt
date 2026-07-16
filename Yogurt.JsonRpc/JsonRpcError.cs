@@ -23,7 +23,7 @@ public readonly record struct JsonRpcError : IJsonable<JsonRpcError>
         json.Object(obj => {
             obj.Member("code", it => it.Number(self.Code));
             obj.Member("message", it => it.String(self.Message));
-            if (self.Data is {} data) obj.Member("data", data.ToJson);
+            if (self.Data is {} data) obj.Member("data", it => it.Value(data));
         });
     }
 
