@@ -4,6 +4,7 @@
     <IsPackable>false</IsPackable>
     <IsAotCompatible>false</IsAotCompatible>
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

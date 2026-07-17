@@ -12,6 +12,17 @@ public readonly record struct JsonRpcError : IJsonable<JsonRpcError>
     public JsonRpcError()
     {}
 
+    [PublicAPI, SetsRequiredMembers]
+    public JsonRpcError(int code, string message)
+    {
+        Code = code;
+        Message = message;
+    }
+
+    [PublicAPI, SetsRequiredMembers]
+    public JsonRpcError(JsonRpcErrorCodes code, string message) : this((int)code, message)
+    {}
+
     [PublicAPI]
     public static JsonRpcError Parse(in JsonValue json) => json.Object(Shape);
 
