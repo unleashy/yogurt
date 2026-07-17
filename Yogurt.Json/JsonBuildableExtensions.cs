@@ -1,10 +1,10 @@
 ﻿namespace Yogurt.Json;
 
-public static class JsonWriteableExtensions
+public static class JsonBuildableExtensions
 {
     [PublicAPI]
     public static JsonValue ToJson<T>(this T self)
-        where T : IJsonWriteable, allows ref struct
+        where T : IJsonBuildable, allows ref struct
     {
         var builder = new JsonBuilder();
         self.ToJson(builder);
