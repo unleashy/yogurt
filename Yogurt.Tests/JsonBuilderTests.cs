@@ -3,17 +3,17 @@ using Yogurt.Json;
 
 namespace Yogurt.Tests;
 
-public class JsonWriterTests
+public class JsonBuilderTests
 {
     [Test]
     public void Null()
     {
-        var sut = new JsonWriter();
+        var sut = new JsonBuilder();
 
         sut.Null();
 
         using (Assert.EnterMultipleScope()) {
-            var json = sut.DrainToJson();
+            var json = sut.Build();
             Assert.That(json.TryNull(), Is.True);
             Assert.That(json.TextAsString(), Is.EqualTo("null"));
         }
@@ -23,11 +23,11 @@ public class JsonWriterTests
     [TestCase(false, "false")]
     public void Boolean(bool value, string result)
     {
-        var sut = new JsonWriter();
+        var sut = new JsonBuilder();
 
         sut.Boolean(value);
 
-        var json = sut.DrainToJson();
+        var json = sut.Build();
         Assert.That(json.TryBoolean(), Is.EqualTo(value));
     }
 
@@ -38,12 +38,12 @@ public class JsonWriterTests
     [TestCase(double.NegativeZero, "-0")]
     public void Number(double value, string result)
     {
-        var sut = new JsonWriter();
+        var sut = new JsonBuilder();
 
         sut.Number(value);
 
         using (Assert.EnterMultipleScope()) {
-            var json = sut.DrainToJson();
+            var json = sut.Build();
             Assert.That(json.Number<double>(), Is.EqualTo(value));
             Assert.That(json.TextAsString(), Is.EqualTo(result));
         }
@@ -54,7 +54,7 @@ public class JsonWriterTests
     [TestCase(double.NegativeInfinity)]
     public void NumberInvalid(double value)
     {
-        var sut = new JsonWriter();
+        var sut = new JsonBuilder();
 
         var f = () => sut.Number(value);
 
@@ -76,12 +76,12 @@ public class JsonWriterTests
     [TestCase("\0\x01", @"""\u0000\u0001""")]
     public void String(string value, string result)
     {
-        var sut = new JsonWriter();
+        var sut = new JsonBuilder();
 
         sut.String(value);
 
         using (Assert.EnterMultipleScope()) {
-            var json = sut.DrainToJson();
+            var json = sut.Build();
             Assert.That(json.String(), Is.EqualTo(value));
             Assert.That(json.TextAsString(), Is.EqualTo(result));
         }
@@ -92,7 +92,7 @@ public class JsonWriterTests
     [SuppressMessage("Performance", "CA1861:Avoid constant arrays as arguments")]
     public void Array()
     {
-        var sut = new JsonWriter();
+        var sut = new JsonBuilder();
 
         sut.Array(it => {
             it.Item(it => it.Number(42));
@@ -104,7 +104,7 @@ public class JsonWriterTests
         });
 
         using (Assert.EnterMultipleScope()) {
-            var json = sut.DrainToJson();
+            var json = sut.Build();
             Assert.That(json.Array().Count(), Is.EqualTo(4));
             Assert.That(json.TextAsString(), Is.EqualTo("""[42,["nested"],true,[]]"""));
         }
@@ -114,7 +114,7 @@ public class JsonWriterTests
     [SuppressMessage("ReSharper", "VariableHidesOuterVariable")]
     public void Object()
     {
-        var sut = new JsonWriter();
+        var sut = new JsonBuilder();
 
         sut.Object(it => {
             it.Member("foo", it => it.String("bar"));
@@ -126,7 +126,7 @@ public class JsonWriterTests
         });
 
         using (Assert.EnterMultipleScope()) {
-            var json = sut.DrainToJson();
+            var json = sut.Build();
             Assert.That(json.Object().Count(), Is.EqualTo(3));
             Assert.That(json.TextAsString(),
                 Is.EqualTo("""{"foo":"bar","data":{"code":-32768,"stuff":[null]},"は":{}}""")

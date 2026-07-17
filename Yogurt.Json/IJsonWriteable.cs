@@ -3,5 +3,5 @@
 public interface IJsonWriteable
 {
     [PublicAPI]
-    public void ToJson(JsonWriter json);
+    public void ToJson(JsonBuilder json);
 }

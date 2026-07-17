@@ -23,7 +23,7 @@ public readonly record struct JsonRpcRequest : IJsonable<JsonRpcRequest>
         json.Object(default, Shape);
 
     [PublicAPI]
-    public void ToJson(JsonWriter json)
+    public void ToJson(JsonBuilder json)
     {
         var self = this;
 

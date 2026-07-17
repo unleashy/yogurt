@@ -45,7 +45,7 @@ public readonly struct JsonRpcId : IEquatable<JsonRpcId>, IJsonable<JsonRpcId>
           );
 
     [PublicAPI]
-    public void ToJson(JsonWriter json)
+    public void ToJson(JsonBuilder json)
     {
         switch (_repr) {
             case Repr.Null:    json.Null(); break;

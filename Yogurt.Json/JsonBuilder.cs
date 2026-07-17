@@ -6,7 +6,7 @@ using System.Numerics;
 
 namespace Yogurt.Json;
 
-public sealed class JsonWriter
+public sealed class JsonBuilder
 {
     private ArrayBufferWriter<byte> _buffer = new();
     private ImmutableArray<Token>.Builder _tokens = ImmutableArray.CreateBuilder<Token>();
@@ -14,7 +14,7 @@ public sealed class JsonWriter
     private bool _hadMember;
 
     [PublicAPI]
-    public JsonValue DrainToJson()
+    public JsonValue Build()
     {
         if (_tokens.Count == 0) {
             throw new InvalidOperationException("No tokens written");
@@ -177,7 +177,7 @@ public sealed class JsonWriter
     private static bool NeedsEscaping(char c) =>  c is <= '\x1F' or '"' or '\\';
 
     [PublicAPI]
-    public void Array(Action<JsonWriter> action)
+    public void Array(Action<JsonBuilder> action)
     {
         var prevHadItem = _hadItem;
         _hadItem = false;
@@ -190,7 +190,7 @@ public sealed class JsonWriter
     }
 
     [PublicAPI]
-    public void Item(Action<JsonWriter> action)
+    public void Item(Action<JsonBuilder> action)
     {
         if (_hadItem) {
             WriteText((byte)',');
@@ -202,7 +202,7 @@ public sealed class JsonWriter
     }
 
     [PublicAPI]
-    public void Object(Action<JsonWriter> action)
+    public void Object(Action<JsonBuilder> action)
     {
         var prevHadMember = _hadMember;
         _hadMember = false;
@@ -215,7 +215,7 @@ public sealed class JsonWriter
     }
 
     [PublicAPI]
-    public void Member(string key, Action<JsonWriter> action)
+    public void Member(string key, Action<JsonBuilder> action)
     {
         if (_hadMember) {
             WriteText((byte)',');

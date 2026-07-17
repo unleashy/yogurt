@@ -16,7 +16,7 @@ public readonly record struct JsonRpcError : IJsonable<JsonRpcError>
     public static JsonRpcError Parse(in JsonValue json) => json.Object(Shape);
 
     [PublicAPI]
-    public void ToJson(JsonWriter json)
+    public void ToJson(JsonBuilder json)
     {
         var self = this;
 

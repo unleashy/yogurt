@@ -6,8 +6,8 @@ public static class JsonWriteableExtensions
     public static JsonValue ToJson<T>(this T self)
         where T : IJsonWriteable, allows ref struct
     {
-        var writer = new JsonWriter();
-        self.ToJson(writer);
-        return writer.DrainToJson();
+        var builder = new JsonBuilder();
+        self.ToJson(builder);
+        return builder.Build();
     }
 }

@@ -41,7 +41,7 @@ public readonly record struct JsonRpcResponse : IJsonable<JsonRpcResponse>
     public static JsonRpcResponse Parse(in JsonValue json) => json.Object(default, Shape);
 
     [PublicAPI]
-    public void ToJson(JsonWriter json)
+    public void ToJson(JsonBuilder json)
     {
         var self = this;
 
