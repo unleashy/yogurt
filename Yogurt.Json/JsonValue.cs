@@ -9,7 +9,10 @@ namespace Yogurt.Json;
 
 using JsonMember = KeyValuePair<string, JsonValue>;
 
-public readonly struct JsonValue
+public readonly struct JsonValue :
+    IEquatable<JsonValue>,
+    ISpanFormattable,
+    IUtf8SpanFormattable
 {
     internal const int MaxDepth = 64;
 
@@ -511,8 +514,37 @@ public readonly struct JsonValue
     [PublicAPI]
     public ReadOnlyMemory<byte> Text => _text;
 
+    public bool Equals(JsonValue other) => _text.Equals(other._text) && _s.Equals(other._s);
+    public override bool Equals(object? obj) => obj is JsonValue other && Equals(other);
+
+    public static bool operator ==(in JsonValue left, in JsonValue right) => left.Equals(right);
+    public static bool operator !=(in JsonValue left, in JsonValue right) => !left.Equals(right);
+
+    public override int GetHashCode() => HashCode.Combine(_text, _s);
+
     [PublicAPI]
-    public string TextAsString() => Utf8.GetString(_text.Span);
+    public override string ToString() => $"{this}";
+    public string ToString(string? format, IFormatProvider? formatProvider) => ToString();
+
+    public bool TryFormat(
+        Span<byte> utf8Destination,
+        out int bytesWritten,
+        ReadOnlySpan<char> format,
+        IFormatProvider? provider
+    )
+    {
+        var ok = Text.Span.TryCopyTo(utf8Destination);
+        bytesWritten = ok ? Text.Span.Length : 0;
+        return ok;
+    }
+
+    public bool TryFormat(
+        Span<char> destination,
+        out int charsWritten,
+        ReadOnlySpan<char> format,
+        IFormatProvider? provider
+    ) =>
+        Utf8.TryGetChars(Text.Span, destination, out charsWritten);
 
     internal ReadOnlyMemory<Token> Tokens => _s.Memory;
 

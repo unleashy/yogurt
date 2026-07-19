@@ -15,7 +15,7 @@ public class JsonBuilderTests
         using (Assert.EnterMultipleScope()) {
             var json = sut.Build();
             Assert.That(json.TryNull(), Is.True);
-            Assert.That(json.TextAsString(), Is.EqualTo("null"));
+            Assert.That(json.ToString(), Is.EqualTo("null"));
         }
     }
 
@@ -45,7 +45,7 @@ public class JsonBuilderTests
         using (Assert.EnterMultipleScope()) {
             var json = sut.Build();
             Assert.That(json.Number<double>(), Is.EqualTo(value));
-            Assert.That(json.TextAsString(), Is.EqualTo(result));
+            Assert.That(json.ToString(), Is.EqualTo(result));
         }
     }
 
@@ -83,7 +83,7 @@ public class JsonBuilderTests
         using (Assert.EnterMultipleScope()) {
             var json = sut.Build();
             Assert.That(json.String(), Is.EqualTo(value));
-            Assert.That(json.TextAsString(), Is.EqualTo(result));
+            Assert.That(json.ToString(), Is.EqualTo(result));
         }
     }
 
@@ -106,7 +106,7 @@ public class JsonBuilderTests
         using (Assert.EnterMultipleScope()) {
             var json = sut.Build();
             Assert.That(json.Array().Count(), Is.EqualTo(4));
-            Assert.That(json.TextAsString(), Is.EqualTo("""[42,["nested"],true,[]]"""));
+            Assert.That(json.ToString(), Is.EqualTo("""[42,["nested"],true,[]]"""));
         }
     }
 
@@ -128,7 +128,7 @@ public class JsonBuilderTests
         using (Assert.EnterMultipleScope()) {
             var json = sut.Build();
             Assert.That(json.Object().Count(), Is.EqualTo(3));
-            Assert.That(json.TextAsString(),
+            Assert.That(json.ToString(),
                 Is.EqualTo("""{"foo":"bar","data":{"code":-32768,"stuff":[null]},"は":{}}""")
             );
         }

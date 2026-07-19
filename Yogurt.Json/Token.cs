@@ -61,7 +61,7 @@ internal readonly record struct Token(TokenKind Kind, int Offset, int Length)
     }
 }
 
-internal readonly struct TokenSlice
+internal readonly struct TokenSlice : IEquatable<TokenSlice>
 {
     private readonly ReadOnlyMemory<Token> _tokens;
 
@@ -84,8 +84,7 @@ internal readonly struct TokenSlice
 
     public bool Has(TokenKind kind) => First.Kind == kind;
 
-    public Token? Match(TokenKind kind) =>
-        First is {} token && token.Kind == kind ? token : null;
+    public Token? Match(TokenKind kind) => First.Kind == kind ? First : null;
 
     public TokenSlice Skip() => Slice(1);
 
@@ -179,4 +178,12 @@ internal readonly struct TokenSlice
                   $"(current length: {_tokens.Length})"
               );
     }
+
+    public bool Equals(TokenSlice other) => _tokens.Equals(other._tokens);
+    public override bool Equals(object? obj) => obj is TokenSlice other && Equals(other);
+
+    public static bool operator ==(TokenSlice left, TokenSlice right) => left.Equals(right);
+    public static bool operator !=(TokenSlice left, TokenSlice right) => !left.Equals(right);
+
+    public override int GetHashCode() => _tokens.GetHashCode();
 }

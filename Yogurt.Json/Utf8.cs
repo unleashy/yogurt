@@ -12,4 +12,13 @@ internal static class Utf8
     public static byte[] GetBytes(string s) => Encoding.GetBytes(s);
 
     public static string GetString(ReadOnlySpan<byte> bytes) => Encoding.GetString(bytes);
+
+    public static bool TryGetChars(
+        ReadOnlySpan<byte> bytes,
+        Span<char> chars,
+        out int charsWritten
+    )
+    {
+        return Encoding.TryGetChars(bytes, chars, out charsWritten);
+    }
 }
