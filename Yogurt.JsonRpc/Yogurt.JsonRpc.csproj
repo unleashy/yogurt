@@ -3,7 +3,8 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Using Include="Yogurt.Json" />
     <ProjectReference Include="..\Yogurt.Json\Yogurt.Json.csproj" />
+
+    <Using Include="Yogurt.Json" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,6 @@
-﻿namespace Yogurt.JsonRpc;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace Yogurt.JsonRpc;
 
 public readonly record struct JsonRpcRequest : IJsonable<JsonRpcRequest>
 {
@@ -15,8 +17,13 @@ public readonly record struct JsonRpcRequest : IJsonable<JsonRpcRequest>
         }
     } = null;
 
-    public JsonRpcRequest()
-    {}
+    [SetsRequiredMembers]
+    public JsonRpcRequest(JsonRpcId? id, string method, JsonValue? @params)
+    {
+        Id = id;
+        Method = method;
+        Params = @params;
+    }
 
     [PublicAPI]
     public static JsonRpcRequest Parse(in JsonValue json) =>

@@ -4,19 +4,16 @@ namespace Yogurt.JsonRpc;
 
 public readonly record struct JsonRpcResponse : IJsonable<JsonRpcResponse>
 {
-    private readonly bool _isResult = false;
-    private readonly JsonValue _result = default;
-    private readonly JsonRpcError _error = new();
-
     [PublicAPI] public required JsonRpcId Id { get; init; } = JsonRpcId.Null;
-    [PublicAPI] public JsonValue? Result => _isResult ? _result : null;
-    [PublicAPI] public JsonRpcError? Error => _isResult ? null : _error;
+    private readonly JsonValue _result;
+    private readonly JsonRpcError _error;
+    private readonly bool _isResult;
 
     [PublicAPI]
-    public static JsonRpcResponse CreateResult(JsonRpcId id, JsonValue result) => new(id, result);
+    public static JsonRpcResponse Result(JsonRpcId id, JsonValue result) => new(id, result);
 
     [PublicAPI]
-    public static JsonRpcResponse CreateError(JsonRpcId id, JsonRpcError error) => new(id, error);
+    public static JsonRpcResponse Error(JsonRpcId id, JsonRpcError error) => new(id, error);
 
     public JsonRpcResponse()
     {}
@@ -38,6 +35,40 @@ public readonly record struct JsonRpcResponse : IJsonable<JsonRpcResponse>
     }
 
     [PublicAPI]
+    public TOut Match<TOut>(Func<JsonValue, TOut> onValue, Func<JsonRpcError, TOut> onError)
+    {
+        if (_isResult) {
+            return onValue(_result);
+        }
+        else {
+            return onError(_error);
+        }
+    }
+
+    [PublicAPI]
+    public void Match(Action<JsonValue> onValue, Action<JsonRpcError> onError)
+    {
+        if (_isResult) {
+            onValue(_result);
+        }
+        else {
+            onError(_error);
+        }
+    }
+
+    [PublicAPI]
+    public JsonValue ToResult =>
+        _isResult
+            ? _result
+            : throw new InvalidOperationException("Response is not a Result");
+
+    [PublicAPI]
+    public JsonRpcError ToError =>
+        _isResult
+            ? _error
+            : throw new InvalidOperationException("Response is not an Error");
+
+    [PublicAPI]
     public static JsonRpcResponse Parse(in JsonValue json) => json.Object(default, Shape);
 
     [PublicAPI]
@@ -49,9 +80,10 @@ public readonly record struct JsonRpcResponse : IJsonable<JsonRpcResponse>
             obj.Member("jsonrpc", it => it.String("2.0"));
             obj.Member("id", self.Id.ToJson);
 
-            if (self.Result is {} result) obj.Member("result", it => it.Value(result));
-            else if (self.Error is {} error) obj.Member("error", error.ToJson);
-            else throw new System.Diagnostics.UnreachableException();
+            self.Match(
+                result => obj.Member("result", it => it.Value(result)),
+                error => obj.Member("error", error.ToJson)
+            );
         });
     }
 
@@ -60,7 +92,7 @@ public readonly record struct JsonRpcResponse : IJsonable<JsonRpcResponse>
             .Require("jsonrpc", static (in json) => json.Literal("2.0"))
             .Require("id", static (in json, res) => res with { Id = JsonRpcId.Parse(json) })
             .RequireOneOf(
-                "result", static (in json, res) => CreateResult(res.Id, json),
-                "error", static (in json, res) => CreateError(res.Id, JsonRpcError.Parse(json))
+                "result", static (in json, res) => Result(res.Id, json),
+                "error", static (in json, res) => Error(res.Id, JsonRpcError.Parse(json))
             );
 }

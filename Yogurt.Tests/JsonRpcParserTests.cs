@@ -13,7 +13,7 @@ public class JsonRpcParserTests
     {
         var sut = Parse("1.2.3");
 
-        Assert.That(sut.Error,
+        Assert.That(sut.ToError,
             Is.EqualTo(
                 new JsonRpcError(
                     JsonRpcErrorCodes.ParseError,
@@ -30,7 +30,7 @@ public class JsonRpcParserTests
     {
         var sut = Parse(input);
 
-        Assert.That(sut.Error?.Code, Is.EqualTo((int)JsonRpcErrorCodes.InvalidRequest));
+        Assert.That(sut.ToError.Code, Is.EqualTo((int)JsonRpcErrorCodes.InvalidRequest));
     }
 
     [TestCase("""{ "jsonrpc": "2.0", "method": "" }""")]
@@ -39,7 +39,7 @@ public class JsonRpcParserTests
     {
         var sut = Parse(input);
 
-        Assert.That(sut.Message?.Request, Is.Not.Null);
+        Assert.That(() => sut.ToMessage.ToRequest, Throws.Nothing);
     }
 
     [TestCase("""{ "jsonrpc": "2.0", "result": true, "id": "id" }""")]
@@ -48,6 +48,16 @@ public class JsonRpcParserTests
     {
         var sut = Parse(input);
 
-        Assert.That(sut.Message?.Response, Is.Not.Null);
+        Assert.That(() => sut.ToMessage.ToResponse, Throws.Nothing);
+    }
+
+    [TestCase("""{ "jsonrpc": "2.0", "result": [] }""")]
+    [TestCase("""{ "jsonrpc": "2.0", "result": [], "error": {}, "id": -32 }""")]
+    [TestCase("""{ "jsonrpc": "2.0", "method": "", "result": [], "id": -32 }""")]
+    public void Parse_InvalidResponse_ReturnsError(string input)
+    {
+        var sut = Parse(input);
+
+        Assert.That(sut.ToError.Code, Is.EqualTo((int)JsonRpcErrorCodes.InvalidRequest));
     }
 }

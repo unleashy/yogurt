@@ -9,10 +9,6 @@ public readonly record struct JsonRpcError : IJsonable<JsonRpcError>
     [PublicAPI] public JsonValue? Data { get; init; } = null;
 
     [PublicAPI, SetsRequiredMembers]
-    public JsonRpcError()
-    {}
-
-    [PublicAPI, SetsRequiredMembers]
     public JsonRpcError(int code, string message)
     {
         Code = code;
@@ -24,7 +20,7 @@ public readonly record struct JsonRpcError : IJsonable<JsonRpcError>
     {}
 
     [PublicAPI]
-    public static JsonRpcError Parse(in JsonValue json) => json.Object(Shape);
+    public static JsonRpcError Parse(in JsonValue json) => json.Object(default, Shape);
 
     [PublicAPI]
     public void ToJson(JsonBuilder json)
