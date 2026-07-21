@@ -2,7 +2,7 @@
 
 namespace Yogurt.JsonRpc;
 
-public sealed class JsonRpcChannel(IJsonRpcTransport transport) : IJsonRpcChannel
+public sealed class JsonRpcChannel(IJsonRpcTransport transport) : IStartableJsonRpcChannel
 {
     private Channel<JsonRpcMessage> _input =
         Channel.CreateBounded<JsonRpcMessage>(

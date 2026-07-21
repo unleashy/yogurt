@@ -3,7 +3,7 @@ using Yogurt.JsonRpc;
 
 namespace Yogurt.Tests.JsonRpc;
 
-internal sealed class FakeChannel : IJsonRpcChannel
+internal sealed class FakeChannel : IStartableJsonRpcChannel
 {
     private readonly Channel<JsonRpcMessage> _input =
         Channel.CreateUnbounded<JsonRpcMessage>(
@@ -24,4 +24,15 @@ internal sealed class FakeChannel : IJsonRpcChannel
 
     public ChannelWriter<JsonRpcMessage> InputWriter => _input.Writer;
     public ChannelReader<JsonRpcMessage> OutputReader => _output.Reader;
+
+    public Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public void Complete()
+    {
+        _ = Output.TryComplete();
+        _ = InputWriter.TryComplete();
+    }
 }
