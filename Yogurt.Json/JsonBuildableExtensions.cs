@@ -14,9 +14,9 @@ public static class JsonBuildableExtensions
         }
 
         [PublicAPI]
-        public ReadOnlyMemory<byte> ToJsonText()
-        {
-            return self.ToJson().Text;
-        }
+        public ReadOnlyMemory<byte> ToJsonText() => self.ToJson().Text;
+
+        [PublicAPI]
+        public string ToJsonString() => Utf8.GetString(self.ToJson().Text.Span);
     }
 }

@@ -533,8 +533,9 @@ public readonly struct JsonValue :
         IFormatProvider? provider
     )
     {
-        var ok = Text.Span.TryCopyTo(utf8Destination);
-        bytesWritten = ok ? Text.Span.Length : 0;
+        var text = _s.Text(_text);
+        var ok = text.TryCopyTo(utf8Destination);
+        bytesWritten = ok ? text.Length : 0;
         return ok;
     }
 
@@ -543,8 +544,10 @@ public readonly struct JsonValue :
         out int charsWritten,
         ReadOnlySpan<char> format,
         IFormatProvider? provider
-    ) =>
-        Utf8.TryGetChars(Text.Span, destination, out charsWritten);
+    )
+    {
+        return Utf8.TryGetChars(_s.Text(_text), destination, out charsWritten);
+    }
 
     internal ReadOnlyMemory<Token> Tokens => _s.Memory;
 

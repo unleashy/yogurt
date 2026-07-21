@@ -81,6 +81,7 @@ internal readonly struct TokenSlice : IEquatable<TokenSlice>
     }
 
     public Token First => _tokens.Span[0];
+    public Token Last => _tokens.Span[^1];
 
     public bool Has(TokenKind kind) => First.Kind == kind;
 
@@ -186,4 +187,12 @@ internal readonly struct TokenSlice : IEquatable<TokenSlice>
     public static bool operator !=(TokenSlice left, TokenSlice right) => !left.Equals(right);
 
     public override int GetHashCode() => _tokens.GetHashCode();
+
+    public ReadOnlySpan<byte> Text(ReadOnlyMemory<byte> text)
+    {
+        var start = First.Offset;
+        var end = Last.Offset + Last.Length;
+
+        return text.Span[start .. end];
+    }
 }
