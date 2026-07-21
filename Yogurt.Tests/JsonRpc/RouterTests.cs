@@ -1,9 +1,9 @@
 ﻿using Yogurt.Json;
 using Yogurt.JsonRpc;
 
-namespace Yogurt.Tests;
+namespace Yogurt.Tests.JsonRpc;
 
-public class JsonRpcRouterTests
+public class RouterTests
 {
     [Test]
     public async Task Invoke_OnRealMethod_ReturnsResponse()

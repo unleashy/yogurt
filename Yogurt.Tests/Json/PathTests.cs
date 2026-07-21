@@ -1,8 +1,8 @@
 ﻿using Yogurt.Json;
 
-namespace Yogurt.Tests;
+namespace Yogurt.Tests.Json;
 
-public class JsonPathTests
+public class PathTests
 {
     [TestCase("")]
     [TestCase(" ")]

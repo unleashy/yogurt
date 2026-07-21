@@ -1,9 +1,9 @@
 ﻿using Yogurt.Json;
 using Yogurt.JsonRpc;
 
-namespace Yogurt.Tests;
+namespace Yogurt.Tests.JsonRpc;
 
-public class JsonRpcRequestTests
+public class RequestTests
 {
     [Test]
     public void RequestNoParams()

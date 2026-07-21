@@ -1,9 +1,9 @@
 ﻿using System.Text;
 using Yogurt.JsonRpc;
 
-namespace Yogurt.Tests;
+namespace Yogurt.Tests.JsonRpc;
 
-public class JsonRpcParserTests
+public class ParserTests
 {
     private static JsonRpcParser.Result Parse(string s) =>
         JsonRpcParser.Parse(Encoding.UTF8.GetBytes(s));

@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Yogurt.Json;
 
-namespace Yogurt.Tests;
+namespace Yogurt.Tests.Json;
 
-public class JsonBuilderTests
+public class BuilderTests
 {
     [Test]
     public void Null()

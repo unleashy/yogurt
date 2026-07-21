@@ -3,9 +3,9 @@ using System.Numerics;
 using System.Reflection;
 using Yogurt.Json;
 
-namespace Yogurt.Tests;
+namespace Yogurt.Tests.Json;
 
-public class JsonTests
+public class ValueTests
 {
     [Test]
     public void Empty()
@@ -187,7 +187,7 @@ public class JsonTests
         ];
 
         var method =
-            typeof(JsonTests)
+            typeof(ValueTests)
                 .GetMethod(
                     nameof(NumbersTypedSingleCases),
                     BindingFlags.NonPublic | BindingFlags.Static
