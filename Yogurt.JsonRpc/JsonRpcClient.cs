@@ -62,6 +62,12 @@ public sealed class JsonRpcClient(IJsonRpcChannel channel) : IJsonRpcObserver
         return ValueTask.FromResult(CompletePending(response));
     }
 
+    [PublicAPI]
+    public void OnComplete()
+    {
+        _ = channel.Output.TryComplete();
+    }
+
     private Task<JsonRpcResponse> RegisterPending(JsonRpcId id, CancellationToken ct)
     {
         var tcs = new TaskCompletionSource<JsonRpcResponse>(

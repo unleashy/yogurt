@@ -120,6 +120,17 @@ public class ServerTests
             Assert.That(channel.OutputReader.Count, Is.Zero);
         }
     }
+
+    [Test]
+    public void OnComplete_CompletesInput()
+    {
+        var channel = new FakeChannel();
+        var sut = new JsonRpcClient(channel);
+
+        sut.OnComplete();
+
+        Assert.That(channel.OutputReader.Completion.IsCompletedSuccessfully, Is.True);
+    }
 }
 
 internal sealed class FakeSubject : IJsonRpcSubject

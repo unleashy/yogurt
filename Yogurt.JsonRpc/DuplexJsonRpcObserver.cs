@@ -18,4 +18,10 @@ public sealed class DuplexJsonRpcObserver(JsonRpcClient client, JsonRpcServer se
     {
         return client.OnResponseAsync(response, cancellationToken);
     }
+
+    public void OnComplete()
+    {
+        client.OnComplete();
+        server.OnComplete();
+    }
 }

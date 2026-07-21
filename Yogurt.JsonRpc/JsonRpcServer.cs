@@ -36,7 +36,7 @@ public sealed class JsonRpcServer(IJsonRpcChannel channel, IJsonRpcSubject subje
 
         return true;
     }
-    
+
     private async ValueTask<bool> NotifyAsyncCore(JsonRpcRequest request, CancellationToken ct)
     {
         await subject.NotifyAsync(request.Method, request.Params, ct);
@@ -68,6 +68,12 @@ public sealed class JsonRpcServer(IJsonRpcChannel channel, IJsonRpcSubject subje
             ),
             cancellationToken
         );
+    }
+
+    [PublicAPI]
+    public void OnComplete()
+    {
+        _ = channel.Output.TryComplete();
     }
 
     ValueTask<bool> IJsonRpcObserver.OnResponseAsync(

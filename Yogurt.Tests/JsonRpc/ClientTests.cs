@@ -116,4 +116,15 @@ public class ClientTests
 
         Assert.That(handled, Is.False);
     }
+
+    [Test]
+    public void OnComplete_CompletesInput()
+    {
+        var channel = new FakeChannel();
+        var sut = new JsonRpcClient(channel);
+
+        sut.OnComplete();
+
+        Assert.That(channel.OutputReader.Completion.IsCompletedSuccessfully, Is.True);
+    }
 }

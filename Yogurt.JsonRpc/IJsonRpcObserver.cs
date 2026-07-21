@@ -13,4 +13,7 @@ public interface IJsonRpcObserver
         JsonRpcResponse response,
         CancellationToken cancellationToken = default
     );
+
+    [PublicAPI]
+    void OnComplete();
 }
