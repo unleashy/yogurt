@@ -48,4 +48,8 @@ public readonly record struct JsonRpcRequest : IJsonable<JsonRpcRequest>
             .Require("method", static (in json, req) => req with { Method = json.String() })
             .Allow("id", static (in json, req) => req with { Id = JsonRpcId.Parse(json) })
             .Allow("params", static (in json, req) => req with { Params = json.StructuralValue() });
+
+    [PublicAPI]
+    public override string ToString() =>
+        $"JsonRpcRequest {{ Method = {Method}, Id = {Id}, Params = {Params} }}";
 }

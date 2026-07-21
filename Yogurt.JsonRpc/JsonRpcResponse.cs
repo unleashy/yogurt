@@ -95,4 +95,14 @@ public readonly record struct JsonRpcResponse : IJsonable<JsonRpcResponse>
                 "result", static (in json, res) => Result(res.Id, json),
                 "error", static (in json, res) => Error(res.Id, JsonRpcError.Parse(json))
             );
+
+    [PublicAPI]
+    public override string ToString()
+    {
+        var id = Id;
+        return Match(
+            result => $"JsonRpcResponse {{ Id = {id}, Result = {result} }}",
+            error => $"JsonRpcResponse {{ Id = {id}, Error = {error} }}"
+        );
+    }
 }

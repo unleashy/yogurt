@@ -1,6 +1,6 @@
 ﻿namespace Yogurt.JsonRpc;
 
-public readonly struct JsonRpcMessage : IJsonParseable<JsonRpcMessage>
+public readonly struct JsonRpcMessage : IJsonable<JsonRpcMessage>
 {
     private readonly JsonRpcRequest _request;
     private readonly JsonRpcResponse _response;
@@ -13,6 +13,54 @@ public readonly struct JsonRpcMessage : IJsonParseable<JsonRpcMessage>
     [PublicAPI]
     public static JsonRpcMessage Response(in JsonRpcResponse response) =>
         new(isResponse: true, response: response);
+
+    private JsonRpcMessage(
+        bool isResponse,
+        in JsonRpcRequest request = default,
+        in JsonRpcResponse response = default
+    )
+    {
+        _isResponse = isResponse;
+        _request = request;
+        _response = response;
+    }
+
+    [PublicAPI]
+    public TOut Match<TOut>(
+        Func<JsonRpcRequest, TOut> onRequest,
+        Func<JsonRpcResponse, TOut> onResponse
+    )
+    {
+        if (_isResponse) {
+            return onResponse(_response);
+        }
+        else {
+            return onRequest(_request);
+        }
+    }
+
+    [PublicAPI]
+    public void Match(Action<JsonRpcRequest> onRequest, Action<JsonRpcResponse> onResponse)
+    {
+        if (_isResponse) {
+            onResponse(_response);
+        }
+        else {
+            onRequest(_request);
+        }
+    }
+
+    [PublicAPI]
+    public JsonRpcRequest ToRequest =>
+        !_isResponse
+            ? _request
+            : throw new InvalidOperationException("Message is not a Request");
+
+    [PublicAPI]
+    public JsonRpcResponse ToResponse =>
+        _isResponse
+            ? _response
+            : throw new InvalidOperationException("Message is not a Response");
 
     [PublicAPI]
     public static JsonRpcMessage Parse(in JsonValue json)
@@ -162,51 +210,19 @@ public readonly struct JsonRpcMessage : IJsonParseable<JsonRpcMessage>
             );
     }
 
-    private JsonRpcMessage(
-        bool isResponse,
-        in JsonRpcRequest request = default,
-        in JsonRpcResponse response = default
-    )
+    [PublicAPI]
+    public void ToJson(JsonBuilder json)
     {
-        _isResponse = isResponse;
-        _request = request;
-        _response = response;
+        Match(
+            request => request.ToJson(json),
+            response => response.ToJson(json)
+        );
     }
 
     [PublicAPI]
-    public TOut Match<TOut>(
-        Func<JsonRpcRequest, TOut> onRequest,
-        Func<JsonRpcResponse, TOut> onResponse
-    )
-    {
-        if (_isResponse) {
-            return onResponse(_response);
-        }
-        else {
-            return onRequest(_request);
-        }
-    }
-
-    [PublicAPI]
-    public void Match(Action<JsonRpcRequest> onRequest, Action<JsonRpcResponse> onResponse)
-    {
-        if (_isResponse) {
-            onResponse(_response);
-        }
-        else {
-            onRequest(_request);
-        }
-    }
-
-    [PublicAPI]
-    public JsonRpcRequest ToRequest =>
-        !_isResponse
-            ? _request
-            : throw new InvalidOperationException("Message is not a Request");
-
-    [PublicAPI]
-    public JsonRpcResponse ToResponse =>
-        _isResponse
-            ? _response
-            : throw new InvalidOperationException("Message is not a Response");
+    public override string ToString() =>
+        Match(
+            request => $"JsonRpcMessage {{ Request = {request} }}",
+            response => $"JsonRpcMessage {{ Response = {response} }}"
+        );
 }
