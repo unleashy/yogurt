@@ -4,23 +4,30 @@ public static class JsonRpcParser
 {
     public readonly struct Result
     {
+        [PublicAPI] public JsonRpcId? Id { get; }
+
         private readonly JsonRpcMessage _message;
         private readonly JsonRpcError _error;
         private readonly bool _isMessage;
 
-        public static Result Message(in JsonRpcMessage message) =>
-            new(isMessage: true, message: message);
+        public static Result Message(in JsonRpcMessage message)
+        {
+            var id = message.Match(req => req.Id, res => res.Id);
+            return new Result(isMessage: true, id, message: message);
+        }
 
-        public static Result Error(in JsonRpcError error) =>
-            new(isMessage: false, error: error);
+        public static Result Error(in JsonRpcId? id, in JsonRpcError error) =>
+            new(isMessage: false, id, error: error);
 
         private Result(
             bool isMessage,
+            JsonRpcId? id,
             JsonRpcMessage message = default,
             JsonRpcError error = default
         )
         {
             _isMessage = isMessage;
+            Id = id;
             _message = message;
             _error = error;
         }
@@ -63,16 +70,36 @@ public static class JsonRpcParser
     [PublicAPI]
     public static Result Parse(ReadOnlyMemory<byte> input)
     {
+        // TODO: refactor this so i don't have to resort to exception-based control flow :(
+        JsonValue json;
         try {
-            var json = JsonValue.Parse(input);
+            json = JsonValue.Parse(input);
+        }
+        catch (JsonParseException e) {
+            return Result.Error(null, new JsonRpcError(JsonRpcErrorCodes.ParseError, e.Message));
+        }
 
+        try {
             return Result.Message(JsonRpcMessage.Parse(json));
         }
         catch (JsonValueException e) {
-            return Result.Error(new JsonRpcError(JsonRpcErrorCodes.InvalidRequest, e.Message));
+            return Result.Error(
+                TryExtractId(json),
+                new JsonRpcError(JsonRpcErrorCodes.InvalidRequest, e.Message)
+            );
         }
-        catch (JsonParseException e) {
-            return Result.Error(new JsonRpcError(JsonRpcErrorCodes.ParseError, e.Message));
+    }
+
+    private static JsonRpcId? TryExtractId(in JsonValue json)
+    {
+        if (json.TryObject() is {} o) {
+            foreach (var member in o) {
+                if (member.Key == "id") {
+                    return JsonRpcId.TryParse(member.Value);
+                }
+            }
         }
+
+        return null;
     }
 }

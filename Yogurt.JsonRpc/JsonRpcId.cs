@@ -35,14 +35,19 @@ public readonly struct JsonRpcId : IEquatable<JsonRpcId>, IJsonable<JsonRpcId>
     }
 
     [PublicAPI]
-    public static JsonRpcId Parse(in JsonValue json) =>
+    public static JsonRpcId? TryParse(in JsonValue json) =>
         json.TryNumber<int>() is {} ival ? JsonRpcId.Int(ival)
         : json.TryString() is {} sval ? JsonRpcId.String(sval)
         : json.TryNull() ? JsonRpcId.Null
-        : throw JsonValueException.Create(
-              json,
-              $"Expected a number parseable as Int, string, or null; got {json.HumanTypeName()}"
-          );
+        : null;
+
+    [PublicAPI]
+    public static JsonRpcId Parse(in JsonValue json) =>
+        TryParse(json) ??
+            throw JsonValueException.Create(
+                json,
+                $"Expected a number parseable as Int, string, or null; got {json.HumanTypeName()}"
+            );
 
     [PublicAPI]
     public void ToJson(JsonBuilder json)

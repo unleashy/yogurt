@@ -60,4 +60,25 @@ public class ParserTests
 
         Assert.That(sut.ToError.Code, Is.EqualTo((int)JsonRpcErrorCodes.InvalidRequest));
     }
+
+    [TestCase("""{ "id": 42 }""")]
+    [TestCase("""{ "jsonrpc": "2.0", "method": 0, "id": 42 }""")]
+    [TestCase("""{ "jsonrpc": "2.0", "params": {}, "id": 42 }""")]
+    public void Parse_Invalid_ExtractsId(string input)
+    {
+        var sut = Parse(input);
+
+        Assert.That(sut.Id, Is.EqualTo(JsonRpcId.Int(42)));
+    }
+
+    [TestCase("""{ }""")]
+    [TestCase("""{ "jsonrpc": "2.0", "method": 0, "id": {} }""")]
+    [TestCase("""{ "jsonrpc": "2.0", "params": {} }""")]
+    [TestCase("""{ "jsonrpc": "2.0", "result": 0, "id": false }""")]
+    public void Parse_InvalidId_DoesntExtractId(string input)
+    {
+        var sut = Parse(input);
+
+        Assert.That(sut.Id, Is.Null);
+    }
 }
