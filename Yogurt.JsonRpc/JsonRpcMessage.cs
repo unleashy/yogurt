@@ -194,19 +194,19 @@ public readonly struct JsonRpcMessage : IJsonable<JsonRpcMessage>, IEquatable<Js
         ) =>
             JsonValueException.Create(
                 member.Value,
-                $"Invalid key \"{member.Key}\" as it conflicts with \"{conflictKey}\""
+                $"Invalid key {member.Key.JsonEscape()} as it conflicts with {conflictKey.JsonEscape()}"
             );
 
         static JsonValueException Duplicate(in KeyValuePair<string, JsonValue> member) =>
             JsonValueException.Create(
                 member.Value,
-                $"Unexpected duplicate key \"{member.Key}\" in object"
+                $"Unexpected duplicate key {member.Key.JsonEscape()} in object"
             );
 
         static JsonValueException Invalid(in KeyValuePair<string, JsonValue> member) =>
             JsonValueException.Create(
                 member.Value,
-                $"Invalid key \"{member.Key}\" in object"
+                $"Invalid key {member.Key.JsonEscape()} in object"
             );
     }
 
