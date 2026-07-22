@@ -2,7 +2,7 @@
 using System.Text;
 using Yogurt.Server;
 
-namespace Yogurt.Tests;
+namespace Yogurt.Tests.Server;
 
 public class ProtocolReaderTests
 {
