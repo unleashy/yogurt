@@ -10,8 +10,8 @@ public sealed class JsonBuilder
 {
     private ArrayBufferWriter<byte> _buffer = new();
     private ImmutableArray<Token>.Builder _tokens = ImmutableArray.CreateBuilder<Token>();
-    private bool _hadItem;
-    private bool _hadMember;
+    private bool _hadItem = false;
+    private bool _hadMember = false;
 
     [PublicAPI]
     public JsonValue Build()
@@ -57,7 +57,7 @@ public sealed class JsonBuilder
             );
         }
 
-        bool hadSpace;
+        var hadSpace = false;
         var length = 0;
 
         do {
@@ -174,7 +174,7 @@ public sealed class JsonBuilder
         AddTokenWithText(TokenKind.StringComplexEnd, (byte)'"');
     }
 
-    private static bool NeedsEscaping(char c) =>  c is <= '\x1F' or '"' or '\\';
+    private static bool NeedsEscaping(char c) => c is <= '\x1F' or '"' or '\\';
 
     [PublicAPI]
     public void Array(Action<JsonBuilder> action)

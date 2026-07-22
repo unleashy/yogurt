@@ -23,6 +23,8 @@ dotnet_diagnostic.CA1310.severity = warning
 dotnet_diagnostic.CA1311.severity = warning
 # Identifiers should not contain type names
 dotnet_diagnostic.CA1720.severity = none
+# Do not initialize unnecessarily
+dotnet_diagnostic.CA1805.severity = none
 # Remove unnecessary suppression
 dotnet_diagnostic.IDE0079.severity = none
 # Remove unnecessary expression value
