@@ -2,7 +2,9 @@
 
 namespace Yogurt.JsonRpc;
 
-public readonly record struct JsonRpcResponse : IJsonable<JsonRpcResponse>
+public readonly struct JsonRpcResponse
+    : IJsonable<JsonRpcResponse>,
+      IEquatable<JsonRpcResponse>
 {
     [PublicAPI] public required JsonRpcId Id { get; init; } = JsonRpcId.Null;
     private readonly JsonValue _result;
@@ -95,6 +97,27 @@ public readonly record struct JsonRpcResponse : IJsonable<JsonRpcResponse>
                 "result", static (in json, res) => Result(res.Id, json),
                 "error", static (in json, res) => Error(res.Id, JsonRpcError.Parse(json))
             );
+
+    [PublicAPI]
+    public bool Equals(JsonRpcResponse other) =>
+        _isResult
+            ? _result.Equals(other._result)
+            : _error.Equals(other._error);
+
+    [PublicAPI]
+    public override bool Equals(object? obj) => obj is JsonRpcResponse other && Equals(other);
+
+    [PublicAPI]
+    public static bool operator ==(JsonRpcResponse left, JsonRpcResponse right) => left.Equals(right);
+
+    [PublicAPI]
+    public static bool operator !=(JsonRpcResponse left, JsonRpcResponse right) => !left.Equals(right);
+
+    [PublicAPI]
+    public override int GetHashCode() =>
+        _isResult
+            ? HashCode.Combine(_isResult, _result)
+            : HashCode.Combine(_isResult, _error);
 
     [PublicAPI]
     public override string ToString()
