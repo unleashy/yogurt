@@ -1,16 +1,32 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
+using System.Threading.Channels;
 
 namespace Yogurt.JsonRpc;
 
 public sealed class JsonRpcClient(IJsonRpcChannel channel) : IJsonRpcObserver
 {
-    private readonly record struct PendingRequest(TaskCompletionSource<JsonRpcResponse> Tcs);
+    private readonly record struct PendingRequest(
+        JsonRpcId Id,
+        TaskCompletionSource<JsonRpcResponse> Tcs
+    );
 
     private readonly ConcurrentDictionary<JsonRpcId, PendingRequest> _pendingRequests = new();
 
     [PublicAPI]
     public Func<JsonRpcId> IdGenerator { get; set; } = DefaultIdGenerator.Generate;
+
+    [PublicAPI]
+    public Task<JsonRpcResponse> InvokeAsync<T>(
+        string method,
+        T parameters,
+        CancellationToken cancellationToken = default
+    )
+        where T : IJsonBuildable, allows ref struct
+    {
+        return InvokeAsync(method, parameters.ToJson(), cancellationToken);
+    }
 
     [PublicAPI]
     public Task<JsonRpcResponse> InvokeAsync(
@@ -27,18 +43,24 @@ public sealed class JsonRpcClient(IJsonRpcChannel channel) : IJsonRpcObserver
         var request = new JsonRpcRequest(id, method, parameters);
         var message = JsonRpcMessage.Request(request);
 
-        var responseTask = RegisterPending(id, cancellationToken);
-        return InvokeAsyncCore(message, responseTask, cancellationToken);
+        var pending = RegisterPending(id, cancellationToken);
+        return InvokeAsyncCore(message, pending, cancellationToken);
     }
 
     private async Task<JsonRpcResponse> InvokeAsyncCore(
         JsonRpcMessage message,
-        Task<JsonRpcResponse> responseTask,
+        PendingRequest pending,
         CancellationToken cancellationToken
     )
     {
-        await channel.Output.WriteAsync(message, cancellationToken);
-        return await responseTask;
+        try {
+            await channel.Output.WriteAsync(message, cancellationToken);
+        }
+        catch (ChannelClosedException e) {
+            FaultPending(pending, e);
+        }
+
+        return await pending.Tcs.Task;
     }
 
     [PublicAPI]
@@ -66,26 +88,35 @@ public sealed class JsonRpcClient(IJsonRpcChannel channel) : IJsonRpcObserver
     public void OnComplete()
     {
         _ = channel.Output.TryComplete();
+        var e = ExceptionDispatchInfo.SetCurrentStackTrace(new ChannelClosedException());
+
+        while (!_pendingRequests.IsEmpty) {
+            foreach (var (id, pending) in _pendingRequests) {
+                _ = _pendingRequests.TryRemove(id, out _);
+                _ = pending.Tcs.TrySetException(e);
+            }
+        }
     }
 
-    private Task<JsonRpcResponse> RegisterPending(JsonRpcId id, CancellationToken ct)
+    private PendingRequest RegisterPending(JsonRpcId id, CancellationToken ct)
     {
         var tcs = new TaskCompletionSource<JsonRpcResponse>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
 
-        if (!_pendingRequests.TryAdd(id, new PendingRequest(tcs))) {
+        var pending = new PendingRequest(id, tcs);
+        if (!_pendingRequests.TryAdd(id, pending)) {
             throw new UnreachableException(
                 $"pending request duplicate ID {id}; this should never happen!"
             );
         }
 
         if (ct.CanBeCanceled) {
-            var reg = ct.Register(() => CancelPending(id, tcs, ct));
+            var reg = ct.Register(() => CancelPending(pending, ct));
             _ = tcs.Task.ContinueWith(_ => reg.Dispose(), CancellationToken.None);
         }
 
-        return tcs.Task;
+        return pending;
     }
 
     private bool CompletePending(JsonRpcResponse response)
@@ -104,14 +135,16 @@ public sealed class JsonRpcClient(IJsonRpcChannel channel) : IJsonRpcObserver
         return true;
     }
 
-    private void CancelPending(
-        JsonRpcId id,
-        TaskCompletionSource<JsonRpcResponse> tcs,
-        CancellationToken ct
-    )
+    private void CancelPending(PendingRequest pending, CancellationToken ct)
     {
-        _ = _pendingRequests.TryRemove(id, out _);
-        _ = tcs.TrySetCanceled(ct);
+        _ = _pendingRequests.TryRemove(pending.Id, out _);
+        _ = pending.Tcs.TrySetCanceled(ct);
+    }
+
+    private void FaultPending(PendingRequest pending, Exception e)
+    {
+        _ = _pendingRequests.TryRemove(pending.Id, out _);
+        _ = pending.Tcs.TrySetException(e);
     }
 
     ValueTask<bool> IJsonRpcObserver.OnRequestAsync(

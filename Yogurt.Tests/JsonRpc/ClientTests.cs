@@ -1,4 +1,5 @@
-﻿using Yogurt.Json;
+﻿using System.Threading.Channels;
+using Yogurt.Json;
 using Yogurt.JsonRpc;
 
 namespace Yogurt.Tests.JsonRpc;
@@ -126,5 +127,18 @@ public class ClientTests
         sut.OnComplete();
 
         Assert.That(channel.OutputReader.Completion.IsCompletedSuccessfully, Is.True);
+    }
+
+    [Test]
+    public async Task OnComplete_DropsPending()
+    {
+        var channel = new FakeChannel();
+        var sut = new JsonRpcClient(channel) { IdGenerator = () => JsonRpcId.Int(0) };
+        var request = new JsonRpcRequest { Id = sut.IdGenerator(), Method = "x" };
+
+        var task = sut.InvokeAsync(request.Method);
+        sut.OnComplete();
+
+        await Assert.ThatAsync(() => task, Throws.InstanceOf<ChannelClosedException>());
     }
 }
